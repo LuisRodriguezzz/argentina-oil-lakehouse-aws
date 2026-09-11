@@ -6,10 +6,12 @@ from datetime import date, datetime
 
 import pyarrow as pa
 
+from pipelines.ingest.manifest import Manifest
 from pipelines.reservas.bronze_load import (
     LandedZip,
     bronze_schema,
     pending_files,
+    read_manifest,
     to_arrow,
     with_lineage,
 )
@@ -20,7 +22,7 @@ def landed(resource_id: str, sha256: str) -> LandedZip:
     return LandedZip(
         resource_id=resource_id,
         resource_name=f"reservas_al_31-12-{resource_id}.zip",
-        landing_key=f"energia/reservas/resource_id={resource_id}/x.zip",
+        landing_key=f"landing/energia/reservas/resource_id={resource_id}/x.zip",
         sha256=sha256,
         ingest_date=date(2026, 9, 5),
     )
@@ -77,3 +79,44 @@ def test_las_filas_se_arman_con_el_esquema_de_la_tabla() -> None:
     assert tabla.num_rows == 1
     assert tabla.column("operador").to_pylist() == ["x"]
     assert tabla.column("_ingest_date").type == pa.date32()
+
+
+def _corrida(manifest: Manifest, resource_id: str, sha256: str, ok: bool) -> None:
+    """Una fila del manifiesto para el recurso, cerrada como ok o como failed."""
+    run_id = manifest.start(
+        dataset="reservas",
+        source_type="http_file",
+        resource_id=resource_id,
+        resource_name=f"reservas_al_31-12-{resource_id}.zip",
+        url=f"http://www.energia.gob.ar/reservas_al_31-12-{resource_id}.zip",
+        size_bytes_source=400_000,
+        last_modified_source=None,
+        ingest_date=date(2026, 9, 5),
+        landing_key=f"landing/energia/reservas/resource_id={resource_id}/{sha256}.zip",
+    )
+    if ok:
+        manifest.finish_ok(
+            run_id,
+            sha256=sha256,
+            size_bytes_landed=400_000,
+            landing_key=f"landing/energia/reservas/resource_id={resource_id}/{sha256}.zip",
+        )
+    else:
+        manifest.finish_failed(run_id, "HTTPError: 500")
+
+
+def test_read_manifest_devuelve_solo_la_ultima_corrida_ok() -> None:
+    """Bronze carga lo que hay hoy en landing: una fila por recurso, la ultima que quedo ok.
+
+    El intento fallido posterior no tiene que tapar ni reemplazar al ultimo ok.
+    """
+    manifest = Manifest("sqlite://")
+    _corrida(manifest, "2024", "aaa", ok=True)
+    _corrida(manifest, "2024", "bbb", ok=True)
+    _corrida(manifest, "2024", "ccc", ok=False)
+
+    landed = read_manifest(manifest)
+
+    assert [(zip_.resource_id, zip_.sha256) for zip_ in landed] == [("2024", "bbb")]
+    assert landed[0].landing_key == "landing/energia/reservas/resource_id=2024/bbb.zip"
+    assert landed[0].ingest_date == date(2026, 9, 5)

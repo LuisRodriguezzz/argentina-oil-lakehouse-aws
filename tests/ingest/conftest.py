@@ -7,6 +7,7 @@ from pathlib import Path
 
 import boto3
 import pytest
+from botocore.exceptions import ClientError
 from moto import mock_aws
 
 from pipelines.ingest.manifest import Manifest
@@ -14,7 +15,10 @@ from pipelines.ingest.registry import load_registry
 from pipelines.ingest.storage import LandingStorage
 
 CKAN_BASE = "http://datos.energia.gob.ar"
-BUCKET = "landing"
+BUCKET = "lakehouse-dev-123"
+# El mismo bucket guarda landing/, warehouse/ y artifacts/: en AWS la ingesta escribe
+# siempre bajo este prefijo.
+PREFIX = "landing"
 
 FIXTURE_YAML = """
 datasets:
@@ -93,7 +97,16 @@ def storage(s3_client) -> LandingStorage:
         bucket=BUCKET,
         client=s3_client,
         part_size=5 * 1024 * 1024,
+        prefix=PREFIX,
     )
+
+
+def tamano_en_s3(s3_client, key: str) -> int | None:
+    """Tamaño del objeto en el bucket de prueba, o None si no llego a existir."""
+    try:
+        return int(s3_client.head_object(Bucket=BUCKET, Key=key)["ContentLength"])
+    except ClientError:
+        return None
 
 
 @pytest.fixture

@@ -11,7 +11,7 @@ from typing import Any
 
 import requests
 
-from pipelines.ingest.ckan import DEFAULT_TIMEOUT, CkanClient, Resource, build_session, force_http
+from pipelines.ingest.ckan import DEFAULT_TIMEOUT, CkanClient, Resource, build_session
 from pipelines.ingest.manifest import STATUS_FAILED, STATUS_OK, STATUS_UNCHANGED, Manifest
 from pipelines.ingest.registry import DatasetSpec
 from pipelines.ingest.storage import LandingStorage, stable_url_id
@@ -41,7 +41,6 @@ class RunSummary:
     """Contadores y detalle de una corrida."""
 
     dataset: str
-    dry_run: bool = False
     items: list[RunItem] = field(default_factory=list)
 
     @property
@@ -97,7 +96,6 @@ def http_file_resources(spec: DatasetSpec, session: requests.Session) -> list[Re
                 format=filename.rsplit(".", 1)[-1].upper() if "." in filename else "",
                 size=size,
                 last_modified=last_modified,
-                datastore_active=False,
             )
         )
     return resources
@@ -149,10 +147,12 @@ def is_unchanged_by_metadata(previous: dict[str, Any] | None, resource: Resource
 
 
 def stream_download(session: requests.Session, url: str) -> Iterator[bytes]:
-    """GET en streaming: el contenido pasa a landing sin tocar el disco local."""
-    with session.get(
-        force_http(url), stream=True, timeout=DOWNLOAD_TIMEOUT, allow_redirects=True
-    ) as response:
+    """GET en streaming: el contenido pasa a landing sin tocar el disco local.
+
+    La URL ya viene normalizada a http (`ckan.force_http` y `datasets.yaml`), asi que no
+    hay que volver a tocarla aca.
+    """
+    with session.get(url, stream=True, timeout=DOWNLOAD_TIMEOUT, allow_redirects=True) as response:
         response.raise_for_status()
         yield from response.iter_content(chunk_size=DOWNLOAD_CHUNK)
 
@@ -333,7 +333,7 @@ def run(
     """Corre la ingesta completa de un dataset y devuelve el resumen."""
     http = session or build_session()
     day = ingest_date or datetime.now().date()
-    summary = RunSummary(dataset=spec.name, dry_run=dry_run)
+    summary = RunSummary(dataset=spec.name)
 
     for resource in discover(spec, ckan=ckan, session=http, only=only):
         if dry_run:

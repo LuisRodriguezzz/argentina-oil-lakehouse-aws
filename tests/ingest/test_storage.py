@@ -13,7 +13,7 @@ from pipelines.ingest.storage import (
     stable_url_id,
 )
 
-from .conftest import BUCKET
+from .conftest import BUCKET, tamano_en_s3
 
 
 def test_upload_stream_reconstruye_el_objeto_y_calcula_sha256(storage, s3_client):
@@ -26,7 +26,7 @@ def test_upload_stream_reconstruye_el_objeto_y_calcula_sha256(storage, s3_client
     assert result.size_bytes == len(payload)
     body = s3_client.get_object(Bucket=BUCKET, Key=result.key)["Body"].read()
     assert body == payload
-    assert storage.object_size(result.key) == len(payload)
+    assert tamano_en_s3(s3_client, result.key) == len(payload)
 
 
 def test_upload_stream_soporta_contenido_vacio(storage, s3_client):
@@ -36,7 +36,7 @@ def test_upload_stream_soporta_contenido_vacio(storage, s3_client):
     assert s3_client.get_object(Bucket=BUCKET, Key=result.key)["Body"].read() == b""
 
 
-def test_upload_stream_aborta_si_el_iterador_falla(storage):
+def test_upload_stream_aborta_si_el_iterador_falla(storage, s3_client):
     def roto():
         yield b"a" * 1024
         raise OSError("conexion cortada")
@@ -47,7 +47,7 @@ def test_upload_stream_aborta_si_el_iterador_falla(storage):
         pass
     else:  # pragma: no cover
         raise AssertionError("deberia propagar el error")
-    assert storage.object_size("energia/test/roto.bin") is None
+    assert tamano_en_s3(s3_client, "energia/test/roto.bin") is None
 
 
 def test_build_key_y_saneo_de_nombre():
@@ -72,19 +72,14 @@ def test_stable_url_id_es_determinista():
     assert stable_url_id(url) != stable_url_id(url + "x")
 
 
-def test_key_for_sin_prefijo_es_la_key_del_dataset(storage):
+def test_key_for_sin_prefijo_es_la_key_del_dataset(s3_client):
     # Sin prefijo la key arranca directo con el prefijo del dataset.
+    storage = LandingStorage(region="us-east-1", bucket=BUCKET, client=s3_client)
     key = storage.key_for("energia/produccion_pozo", "r1", "x.csv", date(2026, 9, 5))
     assert key == "energia/produccion_pozo/resource_id=r1/ingest_date=2026-09-05/x.csv"
 
 
-def test_key_for_antepone_el_prefijo_del_bucket(s3_client):
+def test_key_for_antepone_el_prefijo_del_bucket(storage):
     # En AWS un solo bucket guarda landing/, warehouse/ y artifacts/.
-    storage = LandingStorage(
-        region="us-east-1",
-        bucket="lakehouse-dev-123",
-        client=s3_client,
-        prefix="landing",
-    )
     key = storage.key_for("energia/produccion_pozo", "r1", "x.csv", date(2026, 9, 5))
     assert key == "landing/energia/produccion_pozo/resource_id=r1/ingest_date=2026-09-05/x.csv"

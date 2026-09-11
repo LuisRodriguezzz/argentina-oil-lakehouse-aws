@@ -18,12 +18,13 @@ datasets:
     landing_prefix: energia/produccion_pozo
     # El portal publica cada año en dos familias ("normal" y "DDJJ abiertas y cerradas").
     # Eleccion DEFINITIVA (comparado un anio completo, ver docs/fuentes/comparacion-
-    # familias-produccion.md): nos quedamos con la de DDJJ. Es superconjunto estricto de
-    # la normal (0 filas ni valores en conflicto en lo que comparten, +159 declaraciones
-    # rectificadas que la normal no tiene) y es la unica que la Secretaria sigue
-    # actualizando (la normal quedo congelada 5 meses antes segun CKAN). Ademas se traen
-    # los agregados utiles. La deduplicacion final es por resource_id (2024 esta
-    # duplicado con dos ids en la familia normal).
+    # familias-produccion.md): nos quedamos con la de DDJJ. 0 diferencias en las columnas
+    # de produccion, inyeccion y estado de las declaraciones que comparten (solo corrige
+    # metadata de catalogo en unos pocos pozos), +159 declaraciones rectificadas que la
+    # normal no tiene, y es la unica que la Secretaria sigue actualizando (la normal quedo
+    # congelada 5 meses antes segun CKAN). Ademas se traen los agregados utiles. La
+    # deduplicacion final es por resource_id (2024 esta duplicado con dos ids en la
+    # familia normal).
     include:
       - "\\(DDJJ abiertas y cerradas\\)"
       - "No Convencional"

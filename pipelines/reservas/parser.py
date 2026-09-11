@@ -5,7 +5,7 @@ encabezado fusionados (tipo de recurso, categoria, certeza, fluido) sobre cinco 
 de identificacion. Este modulo lo aplana a una fila por celda de valor, que es la forma
 que puede guardar una tabla Iceberg y consultar SQL.
 
-Son funciones puras sobre bytes o rutas: no tocan S3 ni el catalogo, asi que se testean
+Son funciones puras sobre bytes: no tocan S3 ni el catalogo, asi que se testean
 sin infraestructura.
 """
 
@@ -17,7 +17,6 @@ import re
 import unicodedata
 import zipfile
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import openpyxl
@@ -307,12 +306,6 @@ def parse_bytes(data: bytes, anio_corte: int) -> ParseResult:
         return result
     finally:
         workbook.close()
-
-
-def parse_file(path: Path | str, anio_corte: int | None = None) -> ParseResult:
-    """Filas largas de un XLSX en disco; el anio sale del nombre si no se pasa."""
-    ruta = Path(path)
-    return parse_bytes(ruta.read_bytes(), anio_corte or anio_from_name(ruta.name))
 
 
 def xlsx_from_zip(data: bytes) -> tuple[str, bytes]:

@@ -20,7 +20,6 @@ PACKAGE_SHOW = {
                 "format": "CSV",
                 "size": 307588401,
                 "last_modified": "2026-08-04T08:02:39.279372",
-                "datastore_active": True,
             },
             {
                 "id": "3fcda0c5-68aa-4f33-bbe2-0180e6dbeebe",
@@ -51,14 +50,12 @@ def test_package_show_parsea_y_normaliza():
     assert first.url.startswith("http://")  # el portal redirige https -> http
     assert first.size == 307588401
     assert first.format == "CSV"
-    assert first.datastore_active is True
     assert first.filename == "prod-2024.csv"
 
     second = resources[1]
     assert second.format == "SHP"
     assert second.size == 4146975  # llega como string y se normaliza
     assert second.last_modified == "2019-01-09T13:08:07.908832"  # cae a created
-    assert second.datastore_active is False
 
 
 @responses.activate

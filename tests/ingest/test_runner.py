@@ -9,7 +9,7 @@ import responses
 from pipelines.ingest.ckan import CkanClient
 from pipelines.ingest.runner import run
 
-from .conftest import BUCKET, CKAN_BASE
+from .conftest import BUCKET, CKAN_BASE, tamano_en_s3
 
 PACKAGE_URL = f"{CKAN_BASE}/api/3/action/package_show"
 CSV_2024 = f"{CKAN_BASE}/dataset/x/resource/r2024/download/prod-2024.csv"
@@ -95,7 +95,9 @@ def test_primera_corrida_deja_todo_ok(specs, manifest, storage, s3_client):
 
     item = next(i for i in resumen.items if i.resource_id == "r2024")
     assert item.sha256 == hashlib.sha256(CONTENIDO_2024).hexdigest()
-    assert item.landing_key.startswith("energia/produccion_pozo/resource_id=r2024/ingest_date=")
+    assert item.landing_key.startswith(
+        "landing/energia/produccion_pozo/resource_id=r2024/ingest_date="
+    )
     cuerpo = s3_client.get_object(Bucket=BUCKET, Key=item.landing_key)["Body"].read()
     assert cuerpo == CONTENIDO_2024
 
@@ -151,7 +153,7 @@ def test_contenido_distinto_vuelve_a_ok(specs, manifest, storage):
 
 
 @responses.activate
-def test_un_recurso_roto_no_corta_la_corrida(specs, manifest, storage):
+def test_un_recurso_roto_no_corta_la_corrida(specs, manifest, storage, s3_client):
     _registrar_paquete(_package())
     responses.add(responses.GET, CSV_2024, body="boom", status=500)
     responses.add(responses.GET, CSV_NOCONV, body=CONTENIDO_NOCONV, status=200)
@@ -165,7 +167,7 @@ def test_un_recurso_roto_no_corta_la_corrida(specs, manifest, storage):
     fila = next(f for f in manifest.recent("produccion_pozo") if f["resource_id"] == "r2024")
     assert fila["status"] == "failed" and "500" in fila["error"]
     # el objeto roto no quedo en landing
-    assert storage.object_size(fila["landing_key"]) is None
+    assert tamano_en_s3(s3_client, fila["landing_key"]) is None
 
 
 @responses.activate

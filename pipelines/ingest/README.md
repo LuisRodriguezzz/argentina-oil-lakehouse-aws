@@ -6,8 +6,9 @@ Postgres. No escribe nada en disco.
 
 ## Cómo corre
 
-En AWS es un job de Glue Python shell por dataset, que lanza Step Functions (ADR 0001). El
-wrapper es `pipelines/aws/ingest_job.py` y llama a `runner.run()` directo, sin pasar por la
+En AWS es un único job de Glue Python shell genérico, `ingest_landing`, al que cada máquina de
+estados le pasa su `--dataset` (ADR 0001). El wrapper es `pipelines/aws/ingest_job.py` y llama
+a `runner.run()` directo, sin pasar por la
 CLI: typer necesita Python 3.10 y Python shell trae 3.9. Por eso `manifest.py` tampoco puede
 usar sintaxis ni stdlib posterior a 3.9 (ver `_now`).
 

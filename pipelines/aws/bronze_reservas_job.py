@@ -53,7 +53,11 @@ def main() -> int:
         force=True,
     )
 
-    args = getResolvedOptions(sys.argv, ["WHEEL_S3_URI", "POSTGRES_DSN_SSM_PARAMETER", *ENV_ARGS])
+    # `--resource-id` es opcional y getResolvedOptions falla si pide un argumento que no vino.
+    opcionales = ["resource-id"] if "--resource-id" in sys.argv else []
+    args = getResolvedOptions(
+        sys.argv, ["WHEEL_S3_URI", "POSTGRES_DSN_SSM_PARAMETER", *ENV_ARGS, *opcionales]
+    )
     for name in ENV_ARGS:
         os.environ[name] = args[name]
 
@@ -66,12 +70,14 @@ def main() -> int:
     os.environ["POSTGRES_DSN"] = parameter_value(
         args["POSTGRES_DSN_SSM_PARAMETER"], args["S3_REGION"]
     )
-    return bronze_main([])
+    # getResolvedOptions normaliza el guion a guion bajo en la clave.
+    resource_id = args.get("resource_id")
+    return bronze_main(["--resource-id", resource_id] if resource_id else [])
 
 
 if __name__ == "__main__":
-    # `sys.exit(0)` no: Glue toma cualquier SystemExit del script como fallo del job,
-    # incluso con código 0. Solo se corta la ejecución cuando el job de verdad falló.
+    # `bronze_main` hoy solo devuelve 0: la rama de `sys.exit` está por simetría con los
+    # otros wrappers, donde `sys.exit(0)` sí haría que Glue marque el run como FAILED.
     codigo = main()
     if codigo:
         sys.exit(codigo)

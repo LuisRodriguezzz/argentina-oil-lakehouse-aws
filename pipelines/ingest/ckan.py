@@ -29,7 +29,6 @@ class Resource:
     format: str
     size: int | None
     last_modified: str | None
-    datastore_active: bool
 
     @property
     def filename(self) -> str:
@@ -84,7 +83,6 @@ def resource_from_dict(raw: dict[str, Any], host_suffix: str = PORTAL_HOST_SUFFI
         format=(raw.get("format") or "").strip().upper(),
         size=size if isinstance(size, int) else None,
         last_modified=str(last_modified) if last_modified else None,
-        datastore_active=bool(raw.get("datastore_active")),
     )
 
 

@@ -140,14 +140,12 @@ class LandingStorage:
                     MultipartUpload={"Parts": parts},
                 )
         except Exception:
-            self.client.abort_multipart_upload(Bucket=self.bucket, Key=key, UploadId=upload_id)
+            try:
+                self.client.abort_multipart_upload(Bucket=self.bucket, Key=key, UploadId=upload_id)
+            except Exception as abort_error:
+                # El error que importa es el de la subida; el multipart huerfano lo limpia
+                # la regla de ciclo de vida del bucket.
+                logger.warning("fallo el abort del multipart key=%s error=%s", key, abort_error)
             raise
         logger.info("landing key=%s bytes=%d partes=%d", key, total, len(parts))
         return UploadResult(key=key, sha256=digest.hexdigest(), size_bytes=total)
-
-    def object_size(self, key: str) -> int | None:
-        """Tamaño del objeto en landing, o None si no existe."""
-        try:
-            return int(self.client.head_object(Bucket=self.bucket, Key=key)["ContentLength"])
-        except Exception:
-            return None
