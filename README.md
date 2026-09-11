@@ -72,10 +72,10 @@ las tablas calculadas sobre ella.
 | `pipelines/spark_jobs/bronze_load.py` | Carga cruda con **linaje** por fila y reemplazo de partición por recurso |
 | `pipelines/contracts/` + `silver_load.py` | **Contratos de datos** declarativos: tipos, rangos, checks duros y cuarentena auditable |
 | `pipelines/reservas/` | El caso raro: un **Excel de doble entrada** con 7 filas de encabezado y rangos fusionados, parseado por vocabulario y escrito con pyiceberg |
-| `pipelines/dbt/` | Modelo dimensional con **SCD tipo 2** sobre 21 años, 73 tests y documentación por columna |
+| `pipelines/dbt/` | Modelo dimensional con **SCD tipo 2** sobre 21 años, 81 tests y documentación por columna |
 | `pipelines/aws/` | Los **wrappers de Glue**: traducen argumentos del job a variables de entorno y resuelven el secreto por SSM, nunca en claro |
 | `infra/terraform/` | **IaC** completa: 29 recursos por ambiente, `terraform destroy` deja costo cero |
-| `.github/workflows/ci.yml` | **CI** en dos jobs: lint y tests, y `terraform fmt`/`validate`. No toca AWS |
+| `.github/workflows/ci.yml` | **CI** en tres jobs: lint y tests (más el nombre del wheel que espera Terraform), `terraform fmt`/`validate` y `dbt parse` sin conexión. No toca AWS |
 | `.github/workflows/deploy.yml` | **CD por ambiente**: plan en el PR, apply de dev en `main`, prod con aprobación manual y OIDC (escrito, deshabilitado) |
 
 ## Correrlo en AWS
@@ -117,40 +117,44 @@ reconstruir de cero— está en el runbook [`infra/terraform/README.md`](infra/t
 - **El mart llega a 4.635 pozos** con completación y producción cruzadas.
 - **El acumulado de petróleo a 12 meses crece 7 veces** entre los pozos no convencionales de
   menos de 20 etapas de fractura y los de más de 40 (cuenca Neuquina).
-- **CI en verde**: 129 tests de Python, `ruff check`, `ruff format --check`, `terraform fmt` y
-  `terraform validate`; y los 73 tests de dbt que corren dentro del job de gold.
+- **CI en verde**: 138 tests de Python, `ruff check`, `ruff format --check`, `dbt parse`,
+  `terraform fmt` y `terraform validate`.
+- **81 tests de dbt en verde**, que corren dentro del job de gold y no en el CI: construir gold
+  necesita la cuenta de AWS.
 
 ## Qué se verificó y qué no
 
 Lo que sigue son limitaciones reales del proyecto, no pendientes de redacción.
 
 - **En este repo todavía no se aplicó ningún ambiente.** Los números de arriba —filas, tiempos,
-  costos— se midieron en el proyecto del que deriva (ADR 0006) con este mismo código, sobre su
-  despliegue único sin sufijo de ambiente. Son la referencia contra la que comparar la primera
-  corrida, no una medición de este repositorio.
+  costos y los resultados analíticos— se midieron en el proyecto del que deriva (ADR 0006) con
+  este mismo código, sobre su despliegue único sin sufijo de ambiente. Son la referencia contra
+  la que comparar la primera corrida, no una medición de este repositorio.
 - **dev y prod están definidos en código pero no aplicados.** La variable `environment` sufija
   los 29 recursos, hay un tfvars por ambiente y un workspace de Terraform por state
   ([ADR 0005](docs/adr/0005-ambientes-dev-y-prod.md)). El state sigue siendo local,
   `infra/terraform/bootstrap/` (backend S3, tabla de locks, roles de OIDC) nunca se aplicó y
   `deploy.yml` está deshabilitado a propósito (`if: vars.DEPLOY_ENABLED == 'true'`, variable que
   no existe). Es infraestructura escrita y validada, no infraestructura corriendo.
-- **Los jobs de Glue no corren en paralelo.** Los pipelines de fuente comparten `ingest_landing`
-  y `silver_load`, y un job de Glue admite una corrida a la vez: hay que dispararlos de a uno.
+- **Los jobs de Glue no corren en paralelo.** Se comparten y admiten una corrida a la vez; el
+  pipeline que llega segundo espera y reintenta en vez de fallar
+  ([ADR 0001](docs/adr/0001-lakehouse-serverless-en-aws.md)).
 - **No hay alertas.** Una ejecución fallida queda en el historial de Step Functions y en los
   logs del job; no hay nada que avise. Un webhook en un repo público sería un secreto en el repo.
-- **`dbt docs` no se genera.** El catálogo y el manifiesto quedarían en el disco efímero del job
-  de Glue, sin nadie que los sirva.
+- **`dbt docs` no se genera** ([ADR 0003](docs/adr/0003-gold-con-dbt-sobre-athena.md)).
 - **No hay streaming ni ML.** El proyecto de origen los tenía y acá se dejaron afuera a
   propósito: un stream factura mientras existe y rompe el costo cero en reposo, y MLflow no
   tiene opción gratuita en AWS ([ADR 0006](docs/adr/0006-origen-y-alcance.md)).
-- **El CI no levanta nada en AWS.** Valida lint, tests unitarios y Terraform; que los jobs corran
-  de verdad contra Iceberg y Athena se verifica disparando la máquina de estados a mano
+- **El CI no levanta nada en AWS.** Valida lint, tests unitarios, `dbt parse` y Terraform; que
+  los jobs corran de verdad contra Iceberg y Athena se verifica disparando la máquina de estados
+  a mano
   ([ADR 0004](docs/adr/0004-ci-en-github-actions.md)).
 - **La ingesta de producción usa la familia "DDJJ abiertas y cerradas"**, comparada un año
-  completo (2024) contra la familia normal: es superconjunto estricto (0 filas con valores en
-  conflicto en lo que comparten, +159 declaraciones rectificadas que la normal no tiene) y es la
-  única que la Secretaría sigue actualizando — la normal quedó congelada 5 meses antes según
-  CKAN. Detalle en
+  completo (2024) contra la familia normal: 0 diferencias en las columnas de producción,
+  inyección y estado de las declaraciones que comparten (solo corrige metadata de catálogo en
+  unos pocos pozos), +159 declaraciones rectificadas que la normal no tiene, y es la única que
+  la Secretaría sigue actualizando — la normal quedó congelada 5 meses antes según CKAN. Detalle
+  en
   [`docs/fuentes/comparacion-familias-produccion.md`](docs/fuentes/comparacion-familias-produccion.md).
 
 ## Documentación

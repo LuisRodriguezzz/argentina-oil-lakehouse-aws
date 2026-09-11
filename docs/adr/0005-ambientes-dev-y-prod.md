@@ -50,12 +50,14 @@ sin ambiente. Terraform pasa `--GLUE_DATABASE_SUFFIX` a cada job y:
   `pipelines.spark_jobs.bronze_rules.with_suffix`, que se llama en los dos únicos lugares donde
   un nombre de tabla sale de un YAML: `load_table_rules` y `load_contract`. Todo lo demás
   (cuarentena `_rejects`, historial `dq_runs`) se deriva de ahí y hereda el sufijo.
+- `pipelines/reservas/bronze_load.py` lo pega a mano al namespace (`bronze` + sufijo): el
+  nombre de su tabla es una constante del módulo y no sale de ningún YAML.
 - dbt lo compone en Jinja: `schema: "gold{{ env_var('GLUE_DATABASE_SUFFIX', '') }}"` en
   `profiles.yml` y lo mismo para silver en `models/sources.yml`.
 
 La alternativa era escribir el ambiente en cada YAML de contrato y en cada `source` de dbt. Son
-4 contratos, 1 mapeo de bronze y 11 tablas de fuentes, todos con el mismo sufijo: un lugar donde
-equivocarse por cada archivo, y contratos que dejarían de ser legibles solos.
+4 contratos, 1 mapeo de bronze y 4 tablas de fuentes de dbt, todos con el mismo sufijo: un
+lugar donde equivocarse por cada archivo, y contratos que dejarían de ser legibles solos.
 
 ### Aislamiento del state: workspaces, no carpetas
 

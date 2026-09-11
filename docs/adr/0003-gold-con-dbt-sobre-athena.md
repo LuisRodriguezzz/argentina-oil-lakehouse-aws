@@ -24,7 +24,7 @@ interactiva de Glue por corrida: más caro y un motor más que mantener para el 
 
 Los tests van con los modelos: `unique`, `not_null` y `relationships` en los YAML, más cuatro
 tests singulares en SQL (grano único de los hechos, vigencias de `dim_pozo` sin solapamiento y
-una reconciliación de la producción 2024 contra silver). Son 73 tests que corren en el mismo
+una reconciliación de la producción 2024 contra silver). Son 81 tests que corren en el mismo
 `dbt build` que construye las tablas, así que una tabla mal construida no queda publicada en
 silencio.
 
@@ -48,7 +48,7 @@ orquestadores, `aws_logs.ps1` no la vería y no habría forma de encadenar gold 
 fuentes. La comodidad de tener una sola máquina de estados vale más que 15 centavos.
 
 **Las funciones de Trino con nombre corto viven en `macros/funciones_trino.sql`.** Athena es
-Trino, y media docena de operaciones frecuentes se escriben ahí de forma larga o poco evidente:
+Trino, y siete operaciones frecuentes se escriben ahí de forma larga o poco evidente:
 `md5` toma y devuelve varbinary, no hay forma de armar una fecha desde tres enteros, `unnest` va
 en el `FROM` y no en el `SELECT`. Cada una es una macro de tres líneas, con su porqué al lado,
 para que el modelo se lea por lo que hace y no por cómo se deletrea; tres de ellas —`fin_de_mes`,
@@ -71,8 +71,8 @@ lugares del mismo modelo. Una definición por operación, y los modelos se leen 
   de vida del bucket los borraría a los siete días.
 - El job de gold instala unos cincuenta paquetes en cada corrida (dbt y el wheel con sus
   dependencias). Medido el 2026-09-06 en el proyecto de origen (ADR 0006): 197 s de job, de los
-  cuales 81 son el `dbt build` —8 modelos y 73 tests, todos en verde— y el resto arranque del
-  clúster e instalación. Es el precio de no mantener una imagen propia.
+  cuales 81 son el `dbt build` —los 8 modelos y sus tests, todos en verde— y el resto arranque
+  del clúster e instalación. Es el precio de no mantener una imagen propia.
 - Un modelo nuevo no necesita `terraform apply`: el proyecto de dbt viaja en el wheel, así que
   alcanza con volver a correr `scripts/aws_deploy.ps1`.
 - `dbt docs` no se genera. El catálogo y el manifiesto quedarían en el disco efímero del job de

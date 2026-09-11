@@ -6,8 +6,8 @@ Es el único recurso agregado del dataset que no viene partido por año: un solo
 fila por pozo**, con el año y mes en que ese pozo produjo por primera vez. Sirve para calcular
 la edad del pozo y las curvas de declino en gold (según el contrato).
 
-Medido sobre `data/raw/comparacion/padron.csv`, descargado el 2026-09-06: **86.197 filas, 3
-columnas**, 1,2 MB.
+Medido el 2026-09-06 sobre el CSV descargado del portal, en el proyecto de origen (ADR 0006):
+**86.197 filas, 3 columnas**, 1,2 MB.
 
 ## Columnas
 

@@ -43,10 +43,10 @@ Pruebas ejecutadas contra las fuentes reales antes de escribir infraestructura. 
 3. Contrato de datos para producción: unicidad `idpozo+anio+mes`, `tef` en [0, 744], `prod_*` ≥ 0, `empresa` no nula.
 4. ~~Elegir la familia "DDJJ abiertas y cerradas" o la normal después de comparar un año completo entre ambas (pendiente).~~
    **Resuelto**: se compararon los CSV completos de 2024 de ambas familias con Polars. DDJJ
-   abiertas y cerradas es superconjunto estricto de la normal (0 filas con valores en
-   conflicto en las 983.551 declaraciones que comparten, +159 declaraciones rectificadas que
-   la normal no tiene) y es la única que la Secretaría sigue actualizando (según CKAN, la
-   normal quedó congelada 5 meses antes que la última actualización de DDJJ). Queda elegida
-   DDJJ abiertas y cerradas. Detalle completo en
+   abiertas y cerradas trae 0 diferencias en las columnas de producción, inyección y estado de
+   las 983.551 declaraciones que comparten (solo corrige metadata de catálogo en unos pocos
+   pozos) y +159 declaraciones rectificadas que la normal no tiene; es además la única que la
+   Secretaría sigue actualizando (según CKAN, la normal quedó congelada 5 meses antes que la
+   última actualización de DDJJ). Queda elegida DDJJ abiertas y cerradas. Detalle completo en
    [`docs/fuentes/comparacion-familias-produccion.md`](fuentes/comparacion-familias-produccion.md)
    y ficha de la fuente en [`docs/fuentes/produccion_pozo.md`](fuentes/produccion_pozo.md).

@@ -14,13 +14,19 @@ gastaría presupuesto y rompería el costo cero en reposo (ADR 0001).
 
 ## Decisión
 
-Un solo workflow `ci` en `push` y `pull_request` sobre `main`, con dos jobs, y **ninguno toca
+Un solo workflow `ci` en `push` y `pull_request` sobre `main`, con tres jobs, y **ninguno toca
 AWS**:
 
 - `lint-y-tests`: `uv sync --all-groups`, `ruff check`, `ruff format --check` y `pytest`. Los
   tests corren contra Moto y SQLite (ver `tests/ingest/conftest.py`), no contra servicios
   reales, y las funciones puras de bronze y silver se verifican comparando las expresiones SQL
-  que generan, sin levantar Spark.
+  que generan, sin levantar Spark. Cierra construyendo el wheel y comprobando que se llame como
+  dice `var.wheel_name` en Terraform: si sube la versión del proyecto y nadie toca el tfvars, los
+  jobs de Glue apuntan a un archivo que no está en `artifacts/` y se descubre recién cuando falla
+  una corrida.
+- `dbt`: `dbt parse`, que compila el proyecto entero sin conectarse a Athena y atrapa un `ref()`
+  a un modelo que no existe, un `.yml` que documenta un modelo que ya no está o una macro mal
+  escrita. El `build` y los 81 tests necesitan la cuenta y corren en el job de gold (ADR 0003).
 - `terraform`: `terraform fmt -check -recursive`, `terraform init -backend=false` y
   `terraform validate`, sobre `infra/terraform/` y también sobre `infra/terraform/bootstrap/`,
   que es un directorio raíz aparte con su propio provider y su propio state. Sin credenciales y

@@ -11,10 +11,10 @@ describe la familia elegida, **DDJJ abiertas y cerradas**, que es la que carga
 inyección presentada por la operadora. Es el lado "resultado" del que
 [`fractura.md`](fractura.md) describe "cómo se estimuló el pozo"; se cruzan por `idpozo`.
 
-Medido sobre el año completo 2024 (`data/raw/comparacion/ddjj_2024.csv`) el 2026-09-06:
-**983.710 filas, 38 columnas, 82.379 pozos únicos, 59 empresas**. La tabla completa del
-lakehouse (2006-2026, todos los años con esta misma familia) tiene 18.218.514 filas (ver
-README).
+Medido el 2026-09-06 sobre el CSV anual de 2024 descargado del portal, en el proyecto de
+origen (ADR 0006): **983.710 filas, 38 columnas, 82.379 pozos únicos, 59 empresas**. La tabla
+completa del lakehouse (2006-2026, todos los años con esta misma familia) tiene 18.218.514
+filas (ver README).
 
 ## Columnas
 
@@ -103,7 +103,7 @@ CKAN medido: 2026-08-04); la familia normal quedó congelada en 2026-03-03.
 
 ## Decisiones del contrato
 
-- Se elige la familia DDJJ abiertas y cerradas sobre la normal (pendiente 5 de semana 0,
+- Se elige la familia DDJJ abiertas y cerradas sobre la normal (pendiente 4 de semana 0,
   resuelto); no se ingiere la columna `id`, exclusiva de la familia normal y redundante con
   la clave.
 - `tef` acotado a `[0, 744]`: el valor negativo medido (-0,01) cae en cuarentena por el
