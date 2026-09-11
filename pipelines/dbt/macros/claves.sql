@@ -4,11 +4,13 @@
   apuntando a una empresa que no existe. El test `relationships` lo detectaría, pero es más
   barato tener una sola definición.
 
-  `md5` y el literal de la expresión regular salen de `macros/funciones_trino.sql`.
+  `md5` sale de `macros/funciones_trino.sql`.
 #}
 
 {% macro nombre_empresa(columna) -%}
-    regexp_replace(upper(trim({{ columna }})), {{ patron_espacios() }}, ' ')
+    {# La barra del patrón va sola: Trino no interpreta las secuencias de escape dentro de la
+       comilla simple, así que '\s+' ya es la expresión regular. #}
+    regexp_replace(upper(trim({{ columna }})), '\s+', ' ')
 {%- endmacro %}
 
 

@@ -22,3 +22,10 @@ models:
           Verdadero si el nombre empieza con YPF: incluye a YPF S.A. y a las controladas del
           grupo. Es el filtro del que cuelga casi todo el análisis del proyecto.
         data_tests: [not_null]
+
+      - name: data_origin
+        description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["derived"]

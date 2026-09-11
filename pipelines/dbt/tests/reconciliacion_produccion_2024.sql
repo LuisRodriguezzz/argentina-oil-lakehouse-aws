@@ -21,4 +21,9 @@ from gold
 cross join silver
 -- Tolerancia de 1 m3 sobre millones: los double no se suman en el mismo orden en las dos
 -- consultas y el último decimal puede bailar.
-where abs(gold.total - silver.total) > 1
+-- Los nulos se comparan aparte: si una capa se quedara sin filas de 2024 su `sum` sería nulo,
+-- la resta también, y la comparación no sería verdadera ni falsa sino desconocida, con lo que
+-- el test pasaría sin haber comparado nada.
+where gold.total is null
+   or silver.total is null
+   or abs(gold.total - silver.total) > 1

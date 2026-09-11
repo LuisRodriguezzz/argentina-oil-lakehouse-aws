@@ -89,3 +89,10 @@ models:
         description: >
           Edad del pozo en meses: 0 es el mes de su primera producción. Nula si el pozo no
           figura en el padrón de Capítulo IV, que no cubre a todos los que declaran.
+
+      - name: data_origin
+        description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["derived"]

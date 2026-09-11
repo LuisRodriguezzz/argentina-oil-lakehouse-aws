@@ -108,7 +108,9 @@ models:
         description: "Agente de sostén importado bombeado, en toneladas."
 
       - name: arena_bombeada_total_tn
-        description: "Suma de arena nacional e importada; una de las dos vacía no anula el total."
+        description: >
+          Suma de arena nacional e importada: una de las dos vacía no anula el total, pero si
+          las dos vienen vacías queda nula, que no es lo mismo que un cero declarado.
 
       - name: agua_inyectada_m3
         description: "Agua bombeada en el tratamiento, en m3."
@@ -121,3 +123,10 @@ models:
 
       - name: potencia_equipos_fractura_hp
         description: "Potencia hidráulica del set de bombeo, en HP."
+
+      - name: data_origin
+        description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["derived"]

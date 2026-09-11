@@ -66,6 +66,8 @@ select
     c.tef,
     -- Edad del pozo en meses: 0 es el mes de su primera producción. Nula si el pozo no figura
     -- en el padrón, que no cubre a todos los que declaran.
-    {{ meses_entre('p.primera_produccion', 'c.mes_declarado') }} as meses_desde_primera_produccion
+    {{ meses_entre('p.primera_produccion', 'c.mes_declarado') }} as meses_desde_primera_produccion,
+    -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
+    'derived' as data_origin
 from con_pozo c
 left join padron p on c.idpozo = p.idpozo

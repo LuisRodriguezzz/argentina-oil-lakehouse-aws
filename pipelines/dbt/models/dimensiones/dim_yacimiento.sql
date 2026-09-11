@@ -25,6 +25,8 @@ select
     max_by(cuenca, periodo) as cuenca,
     max_by(provincia, periodo) as provincia,
     max_by(idareapermisoconcesion, periodo) as idareapermisoconcesion,
-    max_by(areapermisoconcesion, periodo) as areapermisoconcesion
+    max_by(areapermisoconcesion, periodo) as areapermisoconcesion,
+    -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
+    'derived' as data_origin
 from observaciones
 group by idareayacimiento

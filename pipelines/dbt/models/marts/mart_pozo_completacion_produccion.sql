@@ -86,7 +86,9 @@ select
     a.prod_gas_3m,
     a.prod_gas_6m,
     a.prod_gas_12m,
-    a.meses_con_declaracion
+    a.meses_con_declaracion,
+    -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
+    'derived' as data_origin
 from ultima_fractura f
 left join pozo_vigente p on f.idpozo = p.idpozo
 left join {{ ref('dim_yacimiento') }} y on p.idareayacimiento = y.idareayacimiento

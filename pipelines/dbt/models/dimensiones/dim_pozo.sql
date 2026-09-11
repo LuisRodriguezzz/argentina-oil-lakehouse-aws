@@ -8,9 +8,10 @@
 -- La receta es la clásica: `lag` para ver si algo cambió respecto del mes anterior y una suma
 -- acumulada de esos cambios para numerar los tramos.
 
--- La clave del tramo se arma acá arriba y no en el SELECT: son tres macros anidadas y de
--- corrido no se leería qué compone la clave.
-{% set clave_del_tramo = "concat_ws('|', " ~ texto('v.idpozo') ~ ', ' ~ texto('v.vigente_desde') ~ ')' %}
+-- La clave del tramo se arma acá arriba y no en el SELECT: anidada dentro de `md5` no se
+-- leería de corrido qué la compone. Los cast son a `varchar` porque Trino no tiene el tipo
+-- `string` y `concat_ws` pide texto.
+{% set clave_del_tramo = "concat_ws('|', cast(v.idpozo as varchar), cast(v.vigente_desde as varchar))" %}
 
 with historia as (
     select
@@ -132,6 +133,8 @@ select
     v.vigente_desde,
     -- El tramo vigente no tiene fin: se cierra el día que el pozo declare algo distinto.
     case when v.es_vigente then null else {{ fin_de_mes('v.ultimo_mes') }} end as vigente_hasta,
-    v.es_vigente
+    v.es_vigente,
+    -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
+    'derived' as data_origin
 from vigencias v
 left join padron p on v.idpozo = p.idpozo

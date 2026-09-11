@@ -97,3 +97,10 @@ models:
       - name: es_vigente
         description: "Verdadero en el último tramo del pozo. Filtrar por acá da una fila por pozo con su estado actual."
         data_tests: [not_null]
+
+      - name: data_origin
+        description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["derived"]

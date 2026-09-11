@@ -30,6 +30,8 @@ select distinct
     {{ clave_empresa('nombre') }} as empresa_key,
     {{ nombre_empresa('nombre') }} as empresa,
     -- Marca al grupo YPF (S.A. y sus controladas), la operadora principal del upstream argentino.
-    {{ nombre_empresa('nombre') }} like 'YPF%' as es_ypf
+    {{ nombre_empresa('nombre') }} like 'YPF%' as es_ypf,
+    -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
+    'derived' as data_origin
 from todas
 where nombre is not null

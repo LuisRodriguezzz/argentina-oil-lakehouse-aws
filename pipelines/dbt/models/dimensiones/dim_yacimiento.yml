@@ -35,3 +35,10 @@ models:
 
       - name: areapermisoconcesion
         description: "Nombre del área de permiso o concesión."
+
+      - name: data_origin
+        description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["derived"]

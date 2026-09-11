@@ -114,3 +114,10 @@ models:
         description: >
           Volumen estimado en la unidad de la fila. Nulo cuando todas las celdas de origen
           venían vacías, que no es lo mismo que un cero declarado.
+
+      - name: data_origin
+        description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["derived"]

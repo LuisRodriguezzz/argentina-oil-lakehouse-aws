@@ -43,17 +43,26 @@ def main() -> int:
     for name in ENV_ARGS:
         os.environ[name] = args[name]
 
-    os.environ["DBT_PROJECT_DIR"] = str(PROJECT_DIR)
-    os.environ["DBT_PROFILES_DIR"] = str(PROJECT_DIR)
+    # Dónde deja dbt sus artefactos. Van por entorno y no como argumento; dbt las lee al
+    # armar los flags dentro de `invoke()`, no al importarse, así que basta fijarlas antes.
     os.environ["DBT_TARGET_PATH"] = str(ARTIFACTS_DIR / "target")
     os.environ["DBT_LOG_PATH"] = str(ARTIFACTS_DIR / "logs")
 
-    # Se importa después de fijar el entorno: dbt lee estas variables al importarse.
     from dbt.cli.main import dbtRunner
 
     # `build` y no `run` + `test`: corre modelos y tests en el orden del grafo y frena la rama
     # si un test falla, así una tabla que no pasa sus tests no propaga el error hacia arriba.
-    result = dbtRunner().invoke(["build", "--target", "aws"])
+    result = dbtRunner().invoke(
+        [
+            "build",
+            "--target",
+            "aws",
+            "--project-dir",
+            str(PROJECT_DIR),
+            "--profiles-dir",
+            str(PROJECT_DIR),
+        ]
+    )
     return 0 if result.success else 1
 
 

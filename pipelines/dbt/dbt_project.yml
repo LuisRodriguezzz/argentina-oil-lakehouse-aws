@@ -7,15 +7,18 @@ model-paths: ["models"]
 macro-paths: ["macros"]
 test-paths: ["tests"]
 
+# El job de Glue está para construir tablas: no tiene por qué mandarle telemetría de uso a un
+# servicio externo en cada corrida.
+flags:
+  send_anonymous_usage_stats: false
+
 models:
   gold:
     # Todo gold son tablas Iceberg en Parquet, igual que bronze y silver: las escribe Athena
-    # y las lee cualquier motor del catálogo de Glue.
+    # y las lee cualquier motor del catálogo de Glue. Nada de gold es vista: las consultas de
+    # análisis leen datos ya calculados.
+    +materialized: table
     +table_type: iceberg
+    # Parquet ya es el default de dbt-athena; se escribe igual porque el formato de las tablas
+    # es parte de lo que gold le promete a quien las lee.
     +format: parquet
-    dimensiones:
-      +materialized: table
-    hechos:
-      +materialized: table
-    marts:
-      +materialized: table

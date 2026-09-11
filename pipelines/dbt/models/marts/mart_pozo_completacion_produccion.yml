@@ -116,3 +116,10 @@ models:
         description: >
           Cuántos de los primeros 12 meses tienen declaración. Sirve para descartar pozos con
           historia incompleta: 12 es una serie completa.
+
+      - name: data_origin
+        description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["derived"]

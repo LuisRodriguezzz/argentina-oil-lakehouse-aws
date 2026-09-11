@@ -4,11 +4,11 @@ models:
   - name: dim_fecha
     description: >
       Calendario mensual del lakehouse: una fila por año-mes desde 2006 (primer año de la serie
-      de producción) hasta diciembre del año en curso. No sale de los datos, se genera con
+      de producción) hasta diciembre del año que viene. No sale de los datos, se genera con
       `sequence`: así no tiene agujeros aunque un mes no traiga declaraciones.
 
-      Llega hasta fin de año y no hasta el mes de hoy porque las fuentes traen fechas futuras:
-      tres fracturas del Adjunto IV declaran inicio en octubre, noviembre y diciembre de 2026
+      Llega un año más allá del corriente porque las fuentes traen fechas futuras: tres
+      fracturas del Adjunto IV declaran inicio en octubre, noviembre y diciembre de 2026
       con el día y el mes invertidos (ids 5489-5491, ver docs/fuentes/fractura.md). El test
       `relationships` de `fact_fractura.fecha_key` fue justamente el que lo encontró.
 
@@ -47,3 +47,10 @@ models:
 
       - name: ultimo_dia
         description: "Último día del mes."
+
+      - name: data_origin
+        description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["derived"]

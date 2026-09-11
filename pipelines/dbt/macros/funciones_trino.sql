@@ -4,6 +4,9 @@
   funciones que se escriben de forma larga o poco evidente se nombran acá para que el modelo
   se lea por lo que hace y no por cómo se deletrea (ADR 0003).
 
+  Solo funciones: un `cast` o un literal se escriben en línea en el modelo, donde se leen de
+  una y con el comentario del porqué al lado.
+
   `fin_de_mes`, `dias_entre` y `meses_entre` no se llaman como la función de Trino porque
   dbt-core ya publica macros `last_day` y `datediff` propias, y redefinirlas en el proyecto
   se las cambiaría también a dbt.
@@ -52,15 +55,3 @@
     select {{ alias }} from unnest(sequence({{ desde }}, {{ hasta }}, interval '1' month)) as t({{ alias }})
 {%- endmacro %}
 
-
-{% macro texto(expresion) -%}
-    {# Trino no tiene el tipo `string`. #}
-    cast({{ expresion }} as varchar)
-{%- endmacro %}
-
-
-{% macro patron_espacios() -%}
-    {# No es una función sino un literal: Trino no interpreta las secuencias de escape dentro
-       de la comilla simple, así que la barra va sola. #}
-    '\s+'
-{%- endmacro %}

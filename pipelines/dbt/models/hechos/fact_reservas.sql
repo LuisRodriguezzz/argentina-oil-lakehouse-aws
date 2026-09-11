@@ -23,7 +23,9 @@ select
     count(distinct concesion) as concesiones,
     -- `sum` ignora nulos: si todas las celdas del grupo venían vacías el total queda nulo, que
     -- es distinto de un cero declarado (docs/fuentes/reservas.md).
-    sum(valor) as valor
+    sum(valor) as valor,
+    -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
+    'derived' as data_origin
 from {{ source('silver', 'reservas') }}
 group by
     operador,

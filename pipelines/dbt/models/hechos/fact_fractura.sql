@@ -30,13 +30,19 @@ select
     f.cantidad_fracturas,
     f.arena_bombeada_nacional_tn,
     f.arena_bombeada_importada_tn,
-    -- Arena total: el `coalesce` es a propósito, una sola de las dos vacías no anula el total.
-    coalesce(f.arena_bombeada_nacional_tn, 0) + coalesce(f.arena_bombeada_importada_tn, 0)
-        as arena_bombeada_total_tn,
+    -- Arena total: una sola de las dos vacías no anula el total, pero si las dos vienen
+    -- vacías el total queda nulo, que es distinto de un cero declarado.
+    case
+        when f.arena_bombeada_nacional_tn is not null or f.arena_bombeada_importada_tn is not null
+            then coalesce(f.arena_bombeada_nacional_tn, 0)
+                + coalesce(f.arena_bombeada_importada_tn, 0)
+    end as arena_bombeada_total_tn,
     f.agua_inyectada_m3,
     f.co2_inyectado_m3,
     f.presion_maxima_psi,
-    f.potencia_equipos_fractura_hp
+    f.potencia_equipos_fractura_hp,
+    -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
+    'derived' as data_origin
 from {{ source('silver', 'fractura') }} f
 left join {{ ref('dim_pozo') }} d
     on f.idpozo = d.idpozo
