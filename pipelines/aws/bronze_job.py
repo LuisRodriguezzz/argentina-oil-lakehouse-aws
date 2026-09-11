@@ -23,14 +23,22 @@ ENV_ARGS = (
 
 
 def main() -> int:
-    args = getResolvedOptions(sys.argv, ["dataset", "POSTGRES_DSN_SSM_PARAMETER", *ENV_ARGS])
+    # `--resource-id` es opcional (sirve para reprocesar un recurso suelto) y
+    # getResolvedOptions falla si pide un argumento que no vino.
+    opcionales = ["resource-id"] if "--resource-id" in sys.argv else []
+    args = getResolvedOptions(
+        sys.argv, ["dataset", "POSTGRES_DSN_SSM_PARAMETER", *ENV_ARGS, *opcionales]
+    )
     for name in ENV_ARGS:
         os.environ[name] = args[name]
     # El DSN es secreto: llega por SSM y no por los argumentos del job.
     os.environ["POSTGRES_DSN"] = parameter_value(
         args["POSTGRES_DSN_SSM_PARAMETER"], args["S3_REGION"]
     )
-    return bronze_main(["--dataset", args["dataset"]])
+    argv = ["--dataset", args["dataset"]]
+    if args.get("resource_id"):
+        argv += ["--resource-id", args["resource_id"]]
+    return bronze_main(argv)
 
 
 if __name__ == "__main__":

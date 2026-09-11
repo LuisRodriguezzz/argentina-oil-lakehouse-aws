@@ -152,6 +152,12 @@ def check_contract(contract: Contract) -> None:
             raise ValueError(f"{contract.name}: {referenced!r} no esta en columns")
     if contract.dedupe_by and contract.dedupe_by not in names:
         raise ValueError(f"{contract.name}: dedupe_by {contract.dedupe_by!r} no esta en columns")
+    # `measure()` cuenta las claves con count_distinct, que descarta los nulos: con una clave
+    # nullable el check duro de duplicados falla sin que haya duplicados reales.
+    por_nombre = {column.name: column for column in contract.columns}
+    for key in contract.primary_key:
+        if por_nombre[key].nullable:
+            raise ValueError(f"{contract.name}: la clave primaria {key!r} no puede ser nullable")
 
 
 def column_names(contract: Contract) -> list[str]:

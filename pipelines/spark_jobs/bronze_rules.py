@@ -15,7 +15,11 @@ DEFAULT_TABLES_PATH = Path(__file__).with_name("bronze_tables.yaml")
 
 
 def load_yaml_file(path: Path | str) -> Any:
-    """Lee y parsea un archivo YAML (PyYAML viaja en el wheel que instala Glue)."""
+    """Lee y parsea un archivo YAML.
+
+    PyYAML lo instala Terraform junto al wheel (`--additional-python-modules`), porque el
+    wheel va con `--no-deps`.
+    """
     return yaml.safe_load(Path(path).read_text(encoding="utf-8"))
 
 

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 import time
 from datetime import UTC, datetime
 
@@ -216,7 +215,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    # `force=True`: el runtime de Glue ya configuró el logging raíz y sin eso basicConfig
+    # no hace nada y las líneas INFO nunca llegan a CloudWatch.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        force=True,
+    )
     args = parse_args(argv)
     config = load_config()
     contract = load_contract(args.contract, suffix=config.glue_database_suffix)
@@ -264,7 +269,3 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         spark.stop()
     return 1 if any(run_status(report) == "failed" for report in reports) else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

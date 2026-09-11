@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from pipelines.reservas.parser import LONG_COLUMNS
 from pipelines.spark_jobs.silver_rules import (
     Contract,
     ContractColumn,
@@ -105,6 +106,15 @@ def test_el_contrato_del_padron_no_tiene_dedupe_ni_rangos_de_fecha():
     assert contract.dedupe_by is None
 
 
+@pytest.mark.parametrize("nombre", contract_names())
+def test_cada_contrato_del_repo_se_lee_y_valida(nombre):
+    # `load_contract` corre `check_contract`: si un YAML queda mal escrito, salta acá y no
+    # a mitad del job en Glue.
+    contract = load_contract(nombre)
+    assert contract.name == nombre
+    assert contract.columns
+
+
 def test_contract_names_lista_los_yaml_disponibles():
     assert contract_names() == [
         "fractura",
@@ -131,6 +141,16 @@ def test_una_clave_primaria_que_no_esta_en_columns_se_rechaza(tmp_path):
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="no esta en columns"):
+        load_contract("malo", tmp_path)
+
+
+def test_una_clave_primaria_nullable_se_rechaza(tmp_path):
+    (tmp_path / "malo.yaml").write_text(
+        "table: lake.silver.x\nsource: lake.bronze.x\nprimary_key: [a]\n"
+        "columns:\n  - name: a\n    type: string\n    nullable: true\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="no puede ser nullable"):
         load_contract("malo", tmp_path)
 
 
@@ -230,6 +250,12 @@ def test_missing_columns_detecta_las_que_faltan_en_bronze():
 def test_missing_columns_vacio_si_bronze_las_tiene_todas():
     contract = contrato(columna("idpozo", "bigint"))
     assert missing_columns(contract, ["idpozo", "otra"]) == []
+
+
+def test_el_contrato_de_reservas_pide_las_columnas_que_escribe_bronze():
+    # Bronze escribe la fila larga del parser: si el contrato nombra otra columna, el job
+    # silver frena en el check duro de esquema recién cuando corre en Glue.
+    assert missing_columns(load_contract("reservas"), list(LONG_COLUMNS)) == []
 
 
 def test_pending_resources_incluye_lo_nuevo_y_lo_cambiado():

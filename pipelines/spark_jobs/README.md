@@ -51,6 +51,9 @@ aws stepfunctions start-execution --state-machine-arn <arn> --input '{}'   # pip
 aws glue start-job-run --job-name silver_load_dev --arguments '{"--contract": "fractura"}'
 ```
 
+Los dos jobs de Spark aceptan además `--resource-id` en `--arguments` para reprocesar un solo
+recurso sin tocar el resto de la tabla.
+
 El input de la ejecución acota la corrida sin tocar la definición: con
 `{"ingesta": {"--only": "^Padr"}}` la ingesta baja solo los recursos que matchean.
 

@@ -1,7 +1,8 @@
 """Estado de una capa del lakehouse, leído del Glue Data Catalog sin Spark ni Java.
 
 Usa pyiceberg con las credenciales y la región del perfil de `~/.aws` del que lo corre.
-Uso: uv run python scripts/check_lake.py --namespace silver --suffix _prod
+Uso: uv run python scripts/check_lake.py --namespace silver [--suffix _prod]
+El sufijo sale de `GLUE_DATABASE_SUFFIX` y, si no está, es `_dev`.
 """
 
 from __future__ import annotations
@@ -47,13 +48,13 @@ def print_partitions(table: Table, name: str) -> None:
     print(f"  {'total':<50}{total:>12,}")
 
 
-def print_last_snapshot(table: Table) -> None:
-    """Última escritura de la tabla, para saber si el job corrió."""
-    snapshots = table.inspect.snapshots().to_pylist()
-    if not snapshots:
-        return
-    last = snapshots[-1]
-    committed = last["committed_at"].astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
+def print_last_snapshot(table: Table, snapshot_id: int) -> None:
+    """Última escritura vigente de la tabla, para saber si el job corrió."""
+    snapshots = {row["snapshot_id"]: row for row in table.inspect.snapshots().to_pylist()}
+    last = snapshots[snapshot_id]
+    # `committed_at` llega naive: pyiceberg declara la columna `timestamp("ms")` sin zona y
+    # el instante ya está en UTC. `astimezone` lo tomaría como hora local y correría el reloj.
+    committed = last["committed_at"].replace(tzinfo=UTC).strftime("%Y-%m-%d %H:%M:%S")
     # `summary` es un map de Arrow: llega como lista de pares (clave, valor).
     summary = dict(last["summary"] or [])
     agregadas = summary.get("added-records", "-")
@@ -87,8 +88,9 @@ def print_rejects(table: Table, name: str) -> None:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Muestra el estado de una capa del lakehouse")
     parser.add_argument("--namespace", default="bronze", help="bronze, silver o gold")
-    # La base del catálogo lleva el ambiente: `silver` + `_prod` -> `silver_prod`.
-    parser.add_argument("--suffix", default=os.environ.get("GLUE_DATABASE_SUFFIX", ""))
+    # La base del catálogo lleva el ambiente: `silver` + `_prod` -> `silver_prod`. Terraform
+    # siempre crea las bases con sufijo de ambiente, así que `bronze` a secas no existe.
+    parser.add_argument("--suffix", default=os.environ.get("GLUE_DATABASE_SUFFIX", "_dev"))
     parser.add_argument("--table", help="mostrar una sola tabla del namespace")
     return parser.parse_args(argv)
 
@@ -112,8 +114,14 @@ def main(argv: list[str] | None = None) -> int:
         elif name.endswith(REJECTS_SUFFIX):
             print_rejects(table, name)
         else:
+            # El vigente y no el último de la lista: un rollback deja atrás snapshots más
+            # nuevos. Sin snapshot vigente la tabla está vacía y `partitions()` falla.
+            snapshot = table.current_snapshot()
+            if snapshot is None:
+                print(f"\n{name}: sin snapshots")
+                continue
             print_partitions(table, name)
-            print_last_snapshot(table)
+            print_last_snapshot(table, snapshot.snapshot_id)
     return 0
 
 
