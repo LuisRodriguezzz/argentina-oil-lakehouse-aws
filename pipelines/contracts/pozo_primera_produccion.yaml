@@ -1,0 +1,26 @@
+# Contrato de datos: padron de pozos de Capitulo IV con su fecha de primera produccion.
+# Una fila por pozo: el anio y el mes en que ese pozo produjo por primera vez.
+# Sirve para calcular la edad del pozo y las curvas de declino en gold.
+
+table: lake.silver.pozo_primera_produccion
+source: lake.bronze.pozo_primera_produccion
+primary_key: [idpozo]
+partition_by: [anio]
+
+columns:
+  - name: idpozo
+    type: bigint
+    nullable: false
+    description: "Identificador unico del pozo en el registro de la Secretaria"
+
+  - name: anio
+    type: int
+    nullable: false
+    description: "Anio de la primera produccion; es la columna de particion"
+
+  - name: mes
+    type: int
+    nullable: false
+    min: 1
+    max: 12
+    description: "Mes de la primera produccion"

@@ -1,0 +1,28 @@
+# Mapeo recurso -> tabla bronze.
+#
+# El dataset `produccion_pozo` no es homogeneo: junto a los CSV anuales de DDJJ, el portal
+# publica agregados con otro esquema o con filas repetidas. Todos en una sola tabla darian
+# datos mal: "No Convencional" es un subconjunto de los anuales (duplicaria filas),
+# "Capitulo IV - Pozos" es un catalogo de pozos y el padron trae solo tres columnas.
+# Por eso cada tipo de recurso tiene su propia tabla.
+#
+# Se aplica el primer `match` (regex sobre el nombre del recurso, case-insensitive) que
+# coincide; el orden de la lista es el orden de evaluacion. Un recurso que no matchea
+# ningun patron se saltea con un WARNING: preferimos no cargar antes que cargar en la
+# tabla equivocada.
+
+datasets:
+  produccion_pozo:
+    - match: "\\(DDJJ abiertas y cerradas\\)"
+      table: lake.bronze.produccion_pozo
+    - match: "No Convencional"
+      table: lake.bronze.produccion_pozo_no_convencional
+    - match: "^Capítulo IV - Pozos$"
+      table: lake.bronze.pozo_catalogo
+    - match: "^Padrón de Pozos"
+      table: lake.bronze.pozo_primera_produccion
+
+  fractura:
+    # El registro de ingesta ya filtra a CSV: cualquier recurso del dataset va a la misma tabla.
+    - match: ".*"
+      table: lake.bronze.fractura

@@ -1,0 +1,192 @@
+# Contrato de datos: operaciones de fractura declaradas en el Adjunto IV.
+# Fuente: Secretaria de Energia, dataset datos-de-fractura-de-pozos-adjunto-iv.
+# Una fila por tratamiento de fractura. Unidades: m para longitudes, tn para el agente de
+# soporte, m3 para agua y CO2, psi para presion y HP para potencia.
+# El perfil que fundamenta tipos, nullables y rangos esta en docs/fuentes/fractura.md.
+
+table: lake.silver.fractura
+source: lake.bronze.fractura
+primary_key: [id_base_fractura_adjiv]
+partition_by: [anio]
+# El recurso se republica entero todos los dias con la leyenda "datos preliminares sujetos a
+# revision": si una declaracion vuelve corregida, gana la de fecha_data mas alta.
+dedupe_by: fecha_data
+
+# nullable: false solo en lo que identifica la fila y en la particion. El resto se deja
+# nullable aunque hoy no tenga nulos: un nulo nuevo en una columna descriptiva no justifica
+# frenar la carga entera.
+columns:
+  - name: id_base_fractura_adjiv
+    type: bigint
+    nullable: false
+    description: "Identificador de la declaracion en la base del Adjunto IV; es la clave"
+
+  - name: idpozo
+    type: bigint
+    nullable: false
+    description: "Pozo fracturado; cruza con produccion_pozo.idpozo"
+
+  - name: sigla
+    type: string
+    nullable: false
+    description: "Sigla del pozo, identificador legible usado en la industria"
+
+  - name: cuenca
+    type: string
+    nullable: false
+    description: "Cuenca sedimentaria (Neuquina, Golfo San Jorge, Austral)"
+
+  - name: areapermisoconcesion
+    type: string
+    nullable: true
+    description: "Nombre del area de permiso o concesion"
+
+  - name: yacimiento
+    type: string
+    nullable: true
+    description: "Nombre del yacimiento"
+
+  - name: formacion_productiva
+    type: string
+    nullable: true
+    description: "Formacion estimulada; el portal la publica en minusculas"
+
+  - name: tipo_reservorio
+    type: string
+    nullable: true
+    allowed_values: [CONVENCIONAL, NO CONVENCIONAL, NO DISCRIMINADO]
+    description: "Tipo de reservorio; separa Vaca Muerta del convencional"
+
+  - name: subtipo_reservorio
+    type: string
+    nullable: true
+    allowed_values: [SHALE, TIGHT]
+    description: "Subtipo del no convencional; vacio cuando el reservorio es convencional"
+
+  - name: longitud_rama_horizontal_m
+    type: double
+    nullable: true
+    min: 0
+    max: 10000
+    description: "Longitud de la rama horizontal en metros; 0 en pozos verticales"
+
+  - name: cantidad_fracturas
+    type: int
+    nullable: true
+    min: 1
+    max: 200
+    description: "Etapas de fractura bombeadas en el tratamiento"
+
+  - name: tipo_terminacion
+    type: string
+    nullable: true
+    description: "Metodo de terminacion (Tapon disparo, Punzado, Camisas deslizables, etc.)"
+
+  - name: arena_bombeada_nacional_tn
+    type: double
+    nullable: true
+    min: 0
+    description: "Agente de soporte de origen nacional bombeado, en toneladas"
+
+  - name: arena_bombeada_importada_tn
+    type: double
+    nullable: true
+    min: 0
+    description: "Agente de soporte importado bombeado, en toneladas"
+
+  - name: agua_inyectada_m3
+    type: double
+    nullable: true
+    min: 0
+    description: "Agua bombeada en el tratamiento, en m3"
+
+  - name: co2_inyectado_m3
+    type: double
+    nullable: true
+    min: 0
+    description: "CO2 inyectado en el tratamiento, en m3"
+
+  # Una fractura real trabaja entre 5.000 y 15.000 psi; arriba de 20.000 es un error de
+  # unidad, no un dato. Son 12 filas (0,25 %) y van a cuarentena.
+  - name: presion_maxima_psi
+    type: double
+    nullable: true
+    min: 0
+    max: 20000
+    description: "Presion maxima de tratamiento en psi"
+
+  # El set de bombeo mas grande del dataset declara 58.161 HP; 100.000 es techo con margen.
+  - name: potencia_equipos_fractura_hp
+    type: double
+    nullable: true
+    min: 0
+    max: 100000
+    description: "Potencia hidraulica del equipo de fractura en HP"
+
+  - name: fecha_inicio_fractura
+    type: date
+    nullable: false
+    description: "Fecha de inicio del tratamiento; es la fecha de referencia del registro"
+
+  - name: fecha_fin_fractura
+    type: date
+    nullable: true
+    description: "Fecha de fin del tratamiento; 41 filas la traen anterior al inicio"
+
+  - name: fecha_data
+    type: timestamp
+    nullable: true
+    description: "Momento en que la fila entro o se corrigio; desempata declaraciones"
+
+  - name: anio_if
+    type: int
+    nullable: true
+    description: "Anio de fecha_inicio_fractura, precalculado por el portal"
+
+  - name: mes_if
+    type: int
+    nullable: true
+    min: 1
+    max: 12
+    description: "Mes de fecha_inicio_fractura, precalculado por el portal"
+
+  - name: anio_ff
+    type: int
+    nullable: true
+    description: "Anio de fecha_fin_fractura, precalculado por el portal"
+
+  - name: mes_ff
+    type: int
+    nullable: true
+    min: 1
+    max: 12
+    description: "Mes de fecha_fin_fractura, precalculado por el portal"
+
+  - name: anio_carga
+    type: int
+    nullable: true
+    description: "Anio en que la declaracion se cargo al sistema"
+
+  - name: mes_carga
+    type: int
+    nullable: true
+    min: 1
+    max: 12
+    description: "Mes en que la declaracion se cargo al sistema"
+
+  - name: empresa_informante
+    type: string
+    nullable: false
+    description: "Razon social de la operadora que declara la fractura"
+
+  - name: mes
+    type: int
+    nullable: false
+    min: 1
+    max: 12
+    description: "Mes de inicio de la fractura; copia de mes_if"
+
+  - name: anio
+    type: int
+    nullable: false
+    description: "Anio de inicio de la fractura; copia de anio_if y columna de particion"

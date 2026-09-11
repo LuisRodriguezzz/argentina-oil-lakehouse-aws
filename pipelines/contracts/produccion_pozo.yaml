@@ -1,0 +1,216 @@
+# Contrato de datos: produccion mensual por pozo (DDJJ abiertas y cerradas).
+# Fuente: Secretaria de Energia, dataset produccion-de-petroleo-y-gas-por-pozo.
+# Unidades: m3 para liquidos, Mm3 (miles de m3) para gas, segun el diccionario del portal.
+
+table: lake.silver.produccion_pozo
+source: lake.bronze.produccion_pozo
+primary_key: [idpozo, anio, mes]
+partition_by: [anio]
+# Un pozo puede declararse mas de una vez para el mismo mes (rectificativas): gana la
+# ultima cargada.
+dedupe_by: fechaingreso
+
+columns:
+  - name: idempresa
+    type: string
+    nullable: true
+    description: "Codigo interno de la empresa declarante"
+
+  - name: anio
+    type: int
+    nullable: false
+    description: "Anio de la declaracion jurada; es la columna de particion"
+
+  - name: mes
+    type: int
+    nullable: false
+    min: 1
+    max: 12
+    description: "Mes de la declaracion jurada"
+
+  - name: idpozo
+    type: bigint
+    nullable: false
+    description: "Identificador unico del pozo en el registro de la Secretaria"
+
+  - name: prod_pet
+    type: double
+    nullable: true
+    min: 0
+    description: "Produccion de petroleo del mes en m3"
+
+  - name: prod_gas
+    type: double
+    nullable: true
+    min: 0
+    description: "Produccion de gas del mes en Mm3"
+
+  - name: prod_agua
+    type: double
+    nullable: true
+    min: 0
+    description: "Produccion de agua del mes en m3"
+
+  - name: iny_agua
+    type: double
+    nullable: true
+    min: 0
+    description: "Inyeccion de agua del mes en m3 (recuperacion secundaria)"
+
+  - name: iny_gas
+    type: double
+    nullable: true
+    min: 0
+    description: "Inyeccion de gas del mes en Mm3"
+
+  - name: iny_co2
+    type: double
+    nullable: true
+    min: 0
+    description: "Inyeccion de CO2 del mes en Mm3"
+
+  - name: iny_otro
+    type: double
+    nullable: true
+    min: 0
+    description: "Inyeccion de otros fluidos del mes"
+
+  - name: tef
+    type: double
+    nullable: true
+    min: 0
+    max: 744
+    description: "Horas efectivas de produccion en el mes; 744 = 31 dias por 24 horas"
+
+  - name: vida_util
+    type: double
+    nullable: true
+    min: 0
+    description: "Vida util estimada del pozo; viene vacia en varios anios"
+
+  - name: tipoextraccion
+    type: string
+    nullable: true
+    description: "Sistema de extraccion declarado"
+
+  - name: tipoestado
+    type: string
+    nullable: true
+    description: "Estado del pozo en el mes (Extraccion Efectiva, Abandonado, etc.)"
+
+  - name: tipopozo
+    type: string
+    nullable: true
+    description: "Destino del pozo (Petrolifero, Gasifero, Inyeccion de Agua, etc.)"
+
+  - name: observaciones
+    type: string
+    nullable: true
+    description: "Texto libre cargado por la empresa"
+
+  - name: fechaingreso
+    type: timestamp
+    nullable: true
+    description: "Momento en que la declaracion entro al sistema; desempata rectificativas"
+
+  - name: rectificado
+    type: boolean
+    nullable: true
+    description: "La declaracion rectifica una anterior; llega como t/f"
+
+  - name: habilitado
+    type: boolean
+    nullable: true
+    description: "La declaracion esta habilitada; llega como t/f"
+
+  - name: idusuario
+    type: string
+    nullable: true
+    description: "Usuario que cargo la declaracion"
+
+  - name: empresa
+    type: string
+    nullable: false
+    description: "Razon social de la empresa declarante"
+
+  - name: sigla
+    type: string
+    nullable: true
+    description: "Sigla del pozo, identificador legible usado en la industria"
+
+  - name: formprod
+    type: string
+    nullable: true
+    description: "Codigo de la formacion productiva"
+
+  - name: profundidad
+    type: double
+    nullable: true
+    min: 0
+    description: "Profundidad del pozo en metros"
+
+  - name: formacion
+    type: string
+    nullable: true
+    description: "Nombre de la formacion productiva"
+
+  - name: idareapermisoconcesion
+    type: string
+    nullable: true
+    description: "Codigo del area de permiso o concesion"
+
+  - name: areapermisoconcesion
+    type: string
+    nullable: true
+    description: "Nombre del area de permiso o concesion"
+
+  - name: idareayacimiento
+    type: string
+    nullable: true
+    description: "Codigo del yacimiento"
+
+  - name: areayacimiento
+    type: string
+    nullable: true
+    description: "Nombre del yacimiento"
+
+  - name: cuenca
+    type: string
+    nullable: true
+    description: "Cuenca sedimentaria (Neuquina, Golfo San Jorge, Austral, Cuyana, Noroeste)"
+
+  - name: provincia
+    type: string
+    nullable: true
+    description: "Provincia donde esta el pozo"
+
+  - name: tipo_de_recurso
+    type: string
+    nullable: true
+    allowed_values: [CONVENCIONAL, NO CONVENCIONAL, SIN RESERVORIO, NO DISCRIMINADO]
+    description: "Tipo de recurso; separa Vaca Muerta del convencional"
+
+  - name: proyecto
+    type: string
+    nullable: true
+    description: "Proyecto al que se imputa la produccion"
+
+  - name: clasificacion
+    type: string
+    nullable: true
+    description: "Clasificacion del pozo (EXPLOTACION, EXPLORACION, SERVICIO, ALMACENAMIENTO)"
+
+  - name: subclasificacion
+    type: string
+    nullable: true
+    description: "Subclasificacion del pozo"
+
+  - name: sub_tipo_recurso
+    type: string
+    nullable: true
+    description: "Subtipo de recurso no convencional (SHALE, TIGHT)"
+
+  - name: fecha_data
+    type: date
+    nullable: true
+    description: "Ultimo dia del mes declarado"

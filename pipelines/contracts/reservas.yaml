@@ -1,0 +1,115 @@
+# Contrato de datos: reservas y recursos por yacimiento al 31 de diciembre.
+# Fuente: Secretaria de Energia, ZIP anual "reservas al 31-12-<anio>" (2020-2024).
+# El XLSX es un cuadro de doble entrada; bronze ya lo aplano a una fila por celda de valor
+# (ver pipelines/reservas/parser.py y docs/fuentes/reservas.md).
+# Unidades: Mm3 (miles de m3) para petroleo y MMm3 (millones de m3) para gas.
+
+table: lake.silver.reservas
+source: lake.bronze.reservas
+primary_key:
+  [
+    operador,
+    cuenca,
+    provincia,
+    concesion,
+    yacimiento,
+    hoja,
+    tipo_recurso,
+    categoria,
+    certeza,
+    fluido,
+    anio_corte,
+  ]
+partition_by: [anio_corte]
+# Tres yacimientos aparecen declarados dos veces en la misma planilla (2020 y 2022), con la
+# declaracion partida entre las dos filas: donde una trae el numero la otra viene vacia.
+# Gana el valor mas alto, que es el unico dato real del par.
+dedupe_by: valor
+
+columns:
+  - name: operador
+    type: string
+    nullable: false
+    description: "Razon social de la operadora que declara (70 valores; YPF S.A. es la mayor)"
+
+  - name: cuenca
+    type: string
+    nullable: false
+    allowed_values:
+      [
+        NEUQUINA,
+        GOLFO SAN JORGE,
+        AUSTRAL,
+        CUYANA,
+        NOROESTE,
+        NORESTE,
+        ÑIRIHUAU,
+        ARGENTINA NORTE,
+      ]
+    description: "Cuenca sedimentaria"
+
+  - name: provincia
+    type: string
+    nullable: false
+    description: "Provincia del yacimiento; 'Estado Nacional' en las areas offshore"
+
+  - name: concesion
+    type: string
+    nullable: false
+    description: "Concesion de explotacion o permiso de exploracion"
+
+  - name: yacimiento
+    type: string
+    nullable: false
+    description: "Yacimiento dentro de la concesion; 'POZOS SIN YACIMIENTO' cuando no se asigna"
+
+  - name: hoja
+    type: string
+    nullable: false
+    allowed_values: [fin_concesion, fin_vida_util]
+    description: "Horizonte de la estimacion: hasta el fin de la concesion o de la vida util"
+
+  - name: tipo_recurso
+    type: string
+    nullable: false
+    allowed_values: [convencional, no_convencional]
+    description: "Tipo de reservorio; el bloque 'convencional + no convencional' del Excel es
+      la suma de estos dos y no se carga"
+
+  - name: categoria
+    type: string
+    nullable: false
+    allowed_values: [reservas, recursos_contingentes]
+    description: "Reservas (comercialmente recuperables) o recursos contingentes (descubiertos
+      pero todavia no comerciales)"
+
+  - name: certeza
+    type: string
+    nullable: false
+    allowed_values: [comprobadas, probables, posibles, no_aplica]
+    description: "Grado de certeza de la estimacion; 'no_aplica' en los recursos contingentes,
+      que el Excel no subdivide. No se deja nulo porque es parte de la clave primaria"
+
+  - name: fluido
+    type: string
+    nullable: false
+    allowed_values: [petroleo, gas]
+    description: "Fluido estimado (PET / GAS en el Excel)"
+
+  - name: unidad
+    type: string
+    nullable: false
+    allowed_values: [Mm3, MMm3]
+    description: "Unidad del valor: Mm3 para petroleo, MMm3 para gas. Depende de `fluido`"
+
+  - name: valor
+    type: double
+    nullable: true
+    min: 0
+    description: "Volumen estimado en la unidad de la fila; nulo cuando la celda viene vacia"
+
+  - name: anio_corte
+    type: int
+    nullable: false
+    min: 2004
+    description: "Anio al 31/12 del que es la estimacion; es la columna de particion"
