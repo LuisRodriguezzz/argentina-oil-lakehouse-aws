@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import socket
 from datetime import date, datetime, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy import (
     BigInteger,
@@ -73,11 +75,36 @@ def _dsn_for_sqlalchemy(dsn: str) -> str:
     return dsn
 
 
+def _ipv4_del_servidor(dsn: str) -> str | None:
+    """Primera direccion IPv4 del host del DSN, o None si no hay host o no resuelve.
+
+    Neon publica direcciones IPv4 e IPv6 y el cliente toma la primera que le da el DNS.
+    Los jobs Python shell de Glue no tienen salida IPv6, y la conexion muere con
+    "Cannot assign requested address". Pedirle al DNS solo IPv4 evita la loteria.
+    """
+    host = urlsplit(dsn).hostname
+    if not host:
+        return None
+    try:
+        direcciones = socket.getaddrinfo(host, 5432, socket.AF_INET, socket.SOCK_STREAM)
+    except socket.gaierror:
+        return None
+    return direcciones[0][4][0] if direcciones else None
+
+
+def _connect_args(dsn: str) -> dict[str, str]:
+    """`hostaddr` fija la IP a la que se conecta psycopg; `host` sigue en el DSN para el SNI."""
+    ipv4 = _ipv4_del_servidor(dsn) if dsn.startswith(("postgresql://", "postgres://")) else None
+    return {"hostaddr": ipv4} if ipv4 else {}
+
+
 class Manifest:
     """Acceso al manifiesto. Funciona igual con Postgres y con SQLite."""
 
     def __init__(self, dsn: str, engine: Engine | None = None) -> None:
-        self.engine = engine or create_engine(_dsn_for_sqlalchemy(dsn), future=True)
+        self.engine = engine or create_engine(
+            _dsn_for_sqlalchemy(dsn), future=True, connect_args=_connect_args(dsn)
+        )
         metadata.create_all(self.engine)
 
     def latest_ok(self, dataset: str, resource_id: str) -> dict[str, Any] | None:

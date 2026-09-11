@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pipelines.ingest.manifest import STATUS_OK, STATUS_UNCHANGED, Manifest
+from pipelines.ingest.manifest import STATUS_OK, STATUS_UNCHANGED, Manifest, _connect_args
 
 DIA = date(2026, 9, 5)
 
@@ -81,3 +81,26 @@ def test_recent_ordena_por_id_descendente(manifest):
     ids = [_start(manifest, resource_id=f"r{i}") for i in range(3)]
     filas = manifest.recent("produccion_pozo", limit=2)
     assert [f["id"] for f in filas] == list(reversed(ids))[:2]
+
+
+def test_connect_args_fija_la_ipv4_del_servidor(monkeypatch):
+    """Postgres: se resuelve el host solo a IPv4 y se pasa como hostaddr."""
+    import socket
+
+    def solo_ipv4(host, port, family, kind):
+        assert (host, family) == ("db.neon.tech", socket.AF_INET)
+        return [(family, kind, 6, "", ("3.147.243.31", port))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", solo_ipv4)
+    assert _connect_args("postgresql://u:p@db.neon.tech/lake") == {"hostaddr": "3.147.243.31"}
+
+
+def test_connect_args_vacio_si_no_es_postgres_o_no_resuelve(monkeypatch):
+    import socket
+
+    def no_resuelve(*args):
+        raise socket.gaierror
+
+    monkeypatch.setattr(socket, "getaddrinfo", no_resuelve)
+    assert _connect_args("sqlite://") == {}
+    assert _connect_args("postgresql://u:p@no-existe.neon.tech/lake") == {}
