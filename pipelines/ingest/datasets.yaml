@@ -1,0 +1,57 @@
+# Registro declarativo de fuentes de la ingesta.
+#
+# Campos por entrada:
+#   name             identificador corto usado en la CLI
+#   source_type      ckan | http_file
+#   ckan_package_id  id o slug del paquete CKAN (source_type=ckan)
+#   url_template     URL con {year} (source_type=http_file)
+#   years            años a expandir en url_template
+#   landing_prefix   prefijo de la key en el bucket landing
+#   include          regex sobre el nombre del recurso (vacio = todos)
+#   exclude          regex sobre el nombre del recurso
+#   formats          formatos permitidos (vacio = todos)
+
+datasets:
+  - name: produccion_pozo
+    source_type: ckan
+    ckan_package_id: produccion-de-petroleo-y-gas-por-pozo
+    landing_prefix: energia/produccion_pozo
+    # El portal publica cada año en dos familias ("normal" y "DDJJ abiertas y cerradas").
+    # Eleccion DEFINITIVA (comparado un anio completo, ver docs/fuentes/comparacion-
+    # familias-produccion.md): nos quedamos con la de DDJJ. Es superconjunto estricto de
+    # la normal (0 filas ni valores en conflicto en lo que comparten, +159 declaraciones
+    # rectificadas que la normal no tiene) y es la unica que la Secretaria sigue
+    # actualizando (la normal quedo congelada 5 meses antes segun CKAN). Ademas se traen
+    # los agregados utiles. La deduplicacion final es por resource_id (2024 esta
+    # duplicado con dos ids en la familia normal).
+    include:
+      - "\\(DDJJ abiertas y cerradas\\)"
+      - "No Convencional"
+      - "^Capítulo IV - Pozos$"
+      - "^Padrón de Pozos"
+    exclude:
+      - "(?i)shape"
+    # "Capítulo IV - Pozos" existe dos veces con el mismo nombre, en CSV y en SHP:
+    # el nombre no alcanza para descartar el shapefile, hace falta el formato.
+    formats: ["CSV"]
+
+  - name: fractura
+    source_type: ckan
+    ckan_package_id: datos-de-fractura-de-pozos-adjunto-iv
+    landing_prefix: energia/fractura
+    include: []
+    exclude: []
+    # El paquete trae ademas una infografia en PDF que no es un dato tabular.
+    formats: ["CSV"]
+
+  - name: reservas
+    source_type: http_file
+    # Fuente fuera de CKAN: ZIP anual publicado en el sitio de la Secretaria.
+    url_template: "http://www.energia.gob.ar/contenidos/archivos/Reorganizacion/informacion_del_mercado/mercado_hidrocarburos/informacion_estadistica/reservas/reservas_al_31-12-{year}.zip"
+    # Verificado con HEAD el 2026-09-05: 2004-2019 y 2025 devuelven 404 con este patron
+    # (y con las variantes de nombre probadas). Solo 2020-2024 estan publicados asi.
+    years: [2020, 2021, 2022, 2023, 2024]
+    landing_prefix: energia/reservas
+    include: []
+    exclude: []
+    formats: []
