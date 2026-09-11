@@ -1,0 +1,79 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancela corridas viejas del mismo branch/PR cuando llega un push nuevo.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # requires-python en pyproject.toml es ">=3.11,<3.13"; fijamos 3.12 para CI.
+  PYTHON_VERSION: "3.12"
+  # Misma version que se usa en la maquina de desarrollo, para que el lock del provider
+  # (.terraform.lock.hcl, con hashes de windows y linux) sirva en los dos lados.
+  TERRAFORM_VERSION: "1.15.8"
+
+jobs:
+  lint-y-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Instalar dependencias del proyecto
+        run: uv sync --all-groups
+
+      - name: Ruff (lint)
+        run: uv run ruff check .
+
+      - name: Ruff (formato)
+        run: uv run ruff format --check .
+
+      - name: Tests
+        run: uv run pytest
+
+  terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Formato
+        run: terraform fmt -check -recursive
+
+      # Sin credenciales: el repo es publico y no hay secretos. `-backend=false` alcanza
+      # para que `validate` resuelva el provider y los tipos, y no corre plan ni apply.
+      # Tampoco hace falta `-var-file`: `validate` no evalua los valores de las variables,
+      # asi que `environment` puede seguir sin default (ADR 0005).
+      - name: Init sin backend
+        run: terraform init -backend=false
+
+      - name: Validate
+        run: terraform validate
+
+      # bootstrap/ es un directorio raiz aparte (tiene su propio provider y su propio state):
+      # el `validate` de arriba no lo mira, y sin esto un error ahi pasaria desapercibido
+      # hasta el dia que se aplique.
+      - name: Init y validate de bootstrap
+        working-directory: infra/terraform/bootstrap
+        run: |
+          terraform init -backend=false
+          terraform validate

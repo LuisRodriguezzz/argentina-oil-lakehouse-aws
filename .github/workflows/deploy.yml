@@ -1,0 +1,186 @@
+##
+# Despliegue de los ambientes dev y prod (ADR 0005).
+#
+# Va aparte de `ci.yml` a propósito: el CI corre en cada push de cualquier rama, no toca la
+# cuenta de AWS y tiene que seguir siendo rápido. Esto habla con AWS, se dispara solo desde
+# `main` y en prod espera una aprobación humana.
+#
+# ESTE WORKFLOW ESTÁ DESHABILITADO. Todos los jobs empiezan con
+# `if: vars.DEPLOY_ENABLED == 'true'` y esa variable no existe en el repo, así que el
+# workflow corre, saltea los tres jobs y termina en verde sin tocar nada. Está así porque el
+# state de Terraform todavía es local (`infra/terraform/versions.tf`): un runner de GitHub
+# arranca vacío, no ve ese archivo y un `apply` desde acá creería que no existe nada y
+# volvería a crear los 29 recursos. Cómo habilitarlo, en `infra/terraform/bootstrap/README.md`.
+#
+# El gate de "solo se despliega lo que pasó CI" es la protección de la rama `main`: a `main`
+# se llega por pull request con el workflow `ci` en verde como check obligatorio. Repetir los
+# tests acá sería correrlos dos veces por el mismo commit.
+##
+
+name: deploy
+
+on:
+  pull_request:
+    branches: [main]
+    # Solo cuando cambia algo que se despliega: un cambio de README o de un doc no tiene
+    # nada que planificar contra AWS.
+    paths:
+      - "infra/terraform/**"
+      - "pipelines/**"
+      - "pyproject.toml"
+      - ".github/workflows/deploy.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infra/terraform/**"
+      - "pipelines/**"
+      - "pyproject.toml"
+      - ".github/workflows/deploy.yml"
+
+# Sin `cancel-in-progress`, al revés que en ci.yml: cancelar un `apply` a la mitad deja
+# recursos creados que el state no conoce. Los despliegues hacen cola.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+# `id-token: write` es lo que habilita OIDC: sin esto el runner no puede pedirle a GitHub el
+# token que AWS cambia por credenciales temporales. No hay claves en los secretos del repo.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  # La misma que en ci.yml y que en la máquina de desarrollo, para que el lock del provider
+  # (.terraform.lock.hcl, con hashes de windows y linux) sirva en los tres lados.
+  TERRAFORM_VERSION: "1.15.8"
+  AWS_REGION: us-east-1
+
+jobs:
+  # --- pull request: qué cambiaría en dev, sin cambiarlo ---------------------------------
+  plan-dev:
+    if: github.event_name == 'pull_request' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      # Credenciales temporales por OIDC. `AWS_ROLE_DEV` es una variable del repo (no un
+      # secreto: es un ARN) que sale del output `github_role_arns` de bootstrap.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Init
+        run: terraform init
+
+      - name: Workspace dev
+        run: terraform workspace select -or-create dev
+
+      # `-lock-timeout`: si el autor está aplicando desde su máquina, esperar en vez de
+      # fallar. Sin `-out`: este plan es para leerlo en el PR, no para aplicarlo.
+      - name: Plan de dev
+        run: terraform plan -input=false -lock-timeout=5m -var-file=envs/dev.tfvars
+
+  # --- push a main: dev se despliega solo ------------------------------------------------
+  deploy-dev:
+    if: github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Aplicar dev
+        working-directory: infra/terraform
+        run: |
+          terraform init
+          terraform workspace select -or-create dev
+          terraform apply -input=false -auto-approve -lock-timeout=5m -var-file=envs/dev.tfvars
+
+      # El mismo artefacto que se va a subir a prod más adelante: un solo `uv build` por
+      # commit y el wheel resultante viaja a los dos buckets (ADR 0005).
+      - name: Construir el wheel
+        run: uv build --wheel
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: dist/*.whl
+          retention-days: 7
+
+      # Lo mismo que hace scripts/aws_deploy.ps1 a mano: wheel y wrappers a artifacts/, de
+      # donde los jobs de Glue leen su script en cada corrida.
+      - name: Publicar artefactos en dev
+        working-directory: infra/terraform
+        run: |
+          bucket=$(terraform output -raw lakehouse_bucket)
+          aws s3 cp ../../dist/ "s3://$bucket/artifacts/" --recursive --exclude "*" --include "*.whl"
+          aws s3 cp ../../pipelines/aws/ "s3://$bucket/artifacts/" --recursive --exclude "*" --include "*_job.py"
+
+  # --- prod: mismo commit, mismo wheel, aprobación humana --------------------------------
+  deploy-prod:
+    # `needs` y no un `if` con el resultado: si dev falla o se saltea, prod ni arranca.
+    needs: deploy-dev
+    if: github.event_name == 'push' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Acá está la aprobación manual: el GitHub Environment `prod` tiene "Required reviewers",
+    # así que el job queda esperando hasta que una persona lo apruebe en la UI. Además es lo
+    # que hace que el token OIDC lleve el claim `environment:prod`, que es lo único que la
+    # trust policy del rol de prod acepta (infra/terraform/bootstrap/oidc.tf).
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Aplicar prod
+        working-directory: infra/terraform
+        run: |
+          terraform init
+          terraform workspace select -or-create prod
+          terraform apply -input=false -auto-approve -lock-timeout=5m -var-file=envs/prod.tfvars
+
+      # El wheel no se vuelve a construir: se baja el que ya se subió a dev. Es la diferencia
+      # entre "el mismo artefacto en los dos ambientes" y "dos builds del mismo commit".
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheel
+          path: dist
+
+      - name: Publicar artefactos en prod
+        working-directory: infra/terraform
+        run: |
+          bucket=$(terraform output -raw lakehouse_bucket)
+          aws s3 cp ../../dist/ "s3://$bucket/artifacts/" --recursive --exclude "*" --include "*.whl"
+          aws s3 cp ../../pipelines/aws/ "s3://$bucket/artifacts/" --recursive --exclude "*" --include "*_job.py"

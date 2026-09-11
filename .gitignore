@@ -1,0 +1,37 @@
+# datos: nunca al repo, se regeneran con el pipeline
+data/
+*.csv
+*.parquet
+*.zip
+*.xlsx
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+# secretos y entornos
+.env
+# wheel que se sube a artifacts/ (se regenera con `uv build`)
+dist/
+# terraform
+# sin prefijo de ruta: hay dos directorios raiz (infra/terraform y su bootstrap/)
+.terraform/
+*.tfstate
+*.tfstate.backup
+# states de los workspaces (terraform.tfstate.d/dev, .../prod) mientras el backend sea local
+terraform.tfstate.d/
+.terraform.tfstate.lock.info
+# plan guardado con -out: es binario y puede traer valores de la cuenta
+*.tfplan
+# dbt: artefactos de una corrida hecha desde el host
+pipelines/dbt/target/
+pipelines/dbt/logs/
+pipelines/dbt/dbt_packages/
+pipelines/dbt/.user.yml
+
+# artefacto de Windows por redirecciones
+NUL
+
+# instrucciones locales del asistente: no se publican
+CLAUDE.md
