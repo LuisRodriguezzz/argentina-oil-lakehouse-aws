@@ -19,7 +19,8 @@ resource "aws_iam_openid_connect_provider" "github" {
 locals {
   # `sub` es el claim que dice quién pide el token. Cada ambiente confía en uno distinto:
   #
-  #   dev  -> los push a `main` y, además, los `pull_request`, porque el workflow corre
+  #   dev  -> el GitHub Environment `dev`, que es el que declara el job `deploy-dev`; los
+  #           push a `main`, y además los `pull_request`, porque el workflow corre
   #           `terraform plan` de dev en cada PR y un plan necesita leer la cuenta.
   #   prod -> solo el GitHub Environment `prod`. Ese claim aparece únicamente cuando el job
   #           declara `environment: prod`, y ese environment está configurado con aprobación
@@ -27,6 +28,9 @@ locals {
   #           rama: ata el rol a la puerta que hay que abrir a mano.
   sujetos = {
     dev = [
+      # Con un `environment:` declarado, GitHub emite este claim y no el de la rama: sin esta
+      # línea el job `deploy-dev` de deploy.yml no puede asumir el rol.
+      "repo:${var.github_repository}:environment:dev",
       "repo:${var.github_repository}:ref:refs/heads/${var.github_branch}",
       "repo:${var.github_repository}:pull_request",
     ]

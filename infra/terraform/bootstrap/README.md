@@ -37,18 +37,23 @@ Después, en este orden:
    `terraform workspace select dev; terraform init -migrate-state`. Terraform pregunta si
    copia el state que ya existe: sí.
 3. Cargar `github_role_arns` en las variables `AWS_ROLE_DEV` y `AWS_ROLE_PROD` del repo.
-4. Crear el GitHub Environment `prod` con "Required reviewers" (uno alcanza) y "Deployment
-   branches: main only". La trust policy del rol de prod exige el claim
-   `environment:prod`, así que sin ese environment el workflow no puede asumirlo.
+4. Crear los dos GitHub Environments. `prod` con "Required reviewers" (uno alcanza) y
+   "Deployment branches: main only"; `dev` sin reviewers ni restricciones. Los dos hacen
+   falta porque los jobs `deploy-dev` y `deploy-prod` declaran `environment:`, y en cuanto un
+   job lo declara GitHub emite el claim `environment:<nombre>` en vez del de la rama: por eso
+   el rol de dev confía en `environment:dev` además de en `main`, y sin esos environments el
+   workflow no puede asumir ninguno de los dos roles.
 5. Poner la variable de repo `DEPLOY_ENABLED = true`, que es lo que destraba los jobs del
    workflow.
 
 ## Trust policy: quién puede asumir cada rol
 
-- **dev** confía en `repo:<owner>/<repo>:ref:refs/heads/main` y en
-  `repo:<owner>/<repo>:pull_request`. El segundo hace falta porque el `terraform plan` de
-  cada PR necesita leer la cuenta. Un fork no puede: los tokens de un PR desde un fork no
-  llevan el `sub` del repo original.
+- **dev** confía en `repo:<owner>/<repo>:environment:dev`, en
+  `repo:<owner>/<repo>:ref:refs/heads/main` y en `repo:<owner>/<repo>:pull_request`. El
+  primero es el que usa el job `deploy-dev`, que declara `environment: dev`; el de la rama
+  queda para un job de push sin environment y el de `pull_request` hace falta porque el
+  `terraform plan` de cada PR necesita leer la cuenta. Un fork no puede: los tokens de un PR
+  desde un fork no llevan el `sub` del repo original.
 - **prod** confía solo en `repo:<owner>/<repo>:environment:prod`. Ese claim aparece
   únicamente cuando el job declara `environment: prod`, y ese environment tiene aprobación
   manual y está restringido a `main`. Es más ajustado que mirar la rama: ata el rol a la

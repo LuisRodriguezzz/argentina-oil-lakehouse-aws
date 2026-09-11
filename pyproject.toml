@@ -34,12 +34,17 @@ exclude = [".venv", "docs"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]
 
-[tool.ruff.lint.per-file-ignores]
-# Los jobs Python shell de Glue traen Python 3.9: `timezone.utc` en vez de `datetime.UTC`
-# (UP017) y `zip` sin `strict` (B905). Los jobs de Spark corren en Glue 5.0 con Python 3.11
-# y no necesitan la excepcion.
-"pipelines/ingest/manifest.py" = ["UP017"]
-"pipelines/reservas/bronze_load.py" = ["UP017", "B905"]
+# Los modulos que corren en un job de Glue Python shell traen Python 3.9; el resto del
+# proyecto pide 3.11 (requires-python) y ruff lo toma de ahi. Lintar cada uno contra su
+# version es mas preciso que ignorar reglas sueltas: ruff no sugiere `datetime.UTC` (UP017)
+# ni `zip(strict=)` (B905) donde no existen, y sigue avisando si algun dia se usa otra cosa
+# de 3.10 o 3.11 en estos archivos.
+[tool.ruff.per-file-target-version]
+"pipelines/ingest/**" = "py39"
+"pipelines/reservas/**" = "py39"
+"pipelines/aws/ingest_job.py" = "py39"
+"pipelines/aws/bronze_reservas_job.py" = "py39"
+"pipelines/aws/ssm.py" = "py39"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

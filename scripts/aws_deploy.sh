@@ -10,6 +10,13 @@ terraform_dir="$repo/infra/terraform"
 # En Git Bash la CLI de AWS puede no estar en el PATH.
 aws_cli="$(command -v aws || echo "/c/Program Files/Amazon/AWSCLIV2/aws.exe")"
 
+# Terraform se chequea antes de construir el wheel: de sus outputs salen el bucket y el
+# ambiente, y sin eso no hay a donde subir nada.
+if ! command -v terraform >/dev/null 2>&1; then
+  echo "No encuentro terraform en el PATH; de sus outputs salen el bucket y el ambiente." >&2
+  exit 1
+fi
+
 echo "== uv build =="
 uv build --wheel --project "$repo"
 wheel="$(ls -t "$repo"/dist/*.whl | head -1)"

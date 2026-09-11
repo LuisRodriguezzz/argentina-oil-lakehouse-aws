@@ -27,6 +27,10 @@ locals {
 
   # Configuración común a todos los jobs: llega como argumentos por defecto y los wrappers
   # de pipelines/aws la exportan a os.environ, que es de donde la lee el código.
+  #
+  # Es un superconjunto a propósito: la ingesta no mira los argumentos del catálogo y silver
+  # no mira los de landing. `getResolvedOptions` ignora los que le sobran, así que un solo
+  # bloque para todos se lee mejor que cuatro listas parecidas que hay que comparar entre sí.
   common_arguments = {
     "--GLUE_WAREHOUSE"    = "${local.bucket_uri}/warehouse"
     "--S3_LANDING_BUCKET" = aws_s3_bucket.lakehouse.bucket
@@ -133,9 +137,7 @@ resource "aws_glue_job" "bronze_reservas" {
     # >= 0.11 y psycopg >= 3.3 piden 3.10. pyarrow va aparte y no como extra de pyiceberg:
     # Glue parte esta lista por comas, asi que un `[glue,pyarrow]` se rompe al medio. Es el
     # FileIO con el que pyiceberg escribe los Parquet, y resuelve las credenciales del rol solo.
-    # pydantic-settings no lo usa este job, pero `pipelines.ingest.__init__` reexporta
-    # `Settings` y basta con importar el manifiesto para que haga falta.
-    "--additional-python-modules"  = "pyiceberg[glue]==0.10.0,pyarrow==17.0.0,openpyxl==3.1.5,sqlalchemy==2.0.52,psycopg[binary]==3.2.13,pydantic-settings==2.9.1"
+    "--additional-python-modules"  = "pyiceberg[glue]==0.10.0,pyarrow==17.0.0,openpyxl==3.1.5,sqlalchemy==2.0.52,psycopg[binary]==3.2.13"
     "--POSTGRES_DSN_SSM_PARAMETER" = local.postgres_dsn_ssm_parameter
   })
 }
@@ -163,12 +165,15 @@ resource "aws_glue_job" "silver_load" {
 # corre igual sobre Glue 5.0 y no sobre Python shell porque Python shell sigue clavado en
 # Python 3.9 y dbt-core lo dejó de soportar en la 1.11.
 resource "aws_glue_job" "gold_dbt" {
-  name              = "gold_dbt${local.sufijo_bajo}"
-  description       = "Construye el modelo dimensional de gold corriendo dbt sobre Athena."
-  role_arn          = aws_iam_role.glue_job.arn
-  glue_version      = "5.0"
-  worker_type       = "G.1X"
-  number_of_workers = var.number_of_workers
+  name         = "gold_dbt${local.sufijo_bajo}"
+  description  = "Construye el modelo dimensional de gold corriendo dbt sobre Athena."
+  role_arn     = aws_iam_role.glue_job.arn
+  glue_version = "5.0"
+  worker_type  = "G.1X"
+  # Dos workers fijos y no `var.number_of_workers`: este job no usa Spark (el SQL lo ejecuta
+  # Athena), así que darle más en prod sería pagar máquinas mirando. Dos es el mínimo que
+  # acepta un job de tipo glueetl.
+  number_of_workers = 2
   max_retries       = 0
   timeout           = 60
 

@@ -43,6 +43,46 @@ jobs:
       - name: Tests
         run: uv run pytest
 
+      # Los jobs de Glue instalan el wheel por nombre (`var.wheel_name`): si sube la version
+      # del proyecto y nadie toca Terraform, los jobs apuntan a un archivo que no existe en
+      # artifacts/ y recien se descubre cuando falla una corrida.
+      - name: El wheel se llama como dice Terraform
+        run: |
+          uv build --wheel
+          grep -q "$(basename dist/*.whl)" infra/terraform/variables.tf
+
+  # `dbt parse` compila el proyecto entero sin conectarse a Athena: atrapa un `ref()` a un
+  # modelo que no existe, un `.yml` que le pone propiedades a un modelo que ya no esta y una
+  # macro mal escrita. El resto de dbt (build, test) necesita la cuenta y vive en el job de
+  # Glue, no en CI.
+  dbt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Valores de mentira: profiles.yml exige estas variables para armar el target, pero como
+    # no se ejecuta ninguna consulta nadie las usa.
+    env:
+      AWS_REGION: us-east-1
+      ATHENA_WORKGROUP: x
+      ATHENA_DATABASE: awsdatacatalog
+      GLUE_DATABASE_SUFFIX: _prod
+      S3_STAGING_DIR: s3://x/a/
+      S3_DATA_DIR: s3://x/b/
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # dbt no esta en las dependencias del proyecto (el job de Glue lo instala con pip a
+      # partir de estas mismas versiones): uvx lo baja a un entorno aparte.
+      - name: dbt parse
+        run: >
+          uvx --from "dbt-core==1.11.14" --with "dbt-athena==1.11.0"
+          dbt parse --profiles-dir pipelines/dbt --project-dir pipelines/dbt
+
   terraform:
     runs-on: ubuntu-latest
     timeout-minutes: 10

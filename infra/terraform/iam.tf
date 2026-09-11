@@ -99,12 +99,6 @@ data "aws_iam_policy_document" "glue_job" {
       values   = ["ssm.${var.region}.amazonaws.com"]
     }
   }
-
-  statement {
-    sid       = "EscribirLogs"
-    actions   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
-    resources = ["arn:aws:logs:${var.region}:${data.aws_caller_identity.actual.account_id}:log-group:/aws-glue/*"]
-  }
 }
 
 resource "aws_iam_role_policy" "glue_job" {
@@ -122,6 +116,9 @@ resource "aws_iam_role" "step_functions" {
 }
 
 data "aws_iam_policy_document" "step_functions" {
+  # Arrancar el job y mirar cómo va, nada más: la integración `.sync` de Glue espera
+  # preguntando con `glue:GetJobRun` (la regla administrada de EventBridge que pide el `.sync`
+  # es la de ECS, Batch y EMR, no la de Glue).
   statement {
     sid     = "CorrerLosJobsDeGlue"
     actions = ["glue:StartJobRun", "glue:GetJobRun", "glue:GetJobRuns", "glue:BatchStopJobRun"]
@@ -132,14 +129,6 @@ data "aws_iam_policy_document" "step_functions" {
       aws_glue_job.silver_load.arn,
       aws_glue_job.gold_dbt.arn,
     ]
-  }
-
-  # El patrón `.sync` de Step Functions se apoya en una regla administrada de EventBridge
-  # para enterarse de que el job terminó.
-  statement {
-    sid       = "ReglaAdministradaDeEventBridge"
-    actions   = ["events:PutRule", "events:PutTargets", "events:DescribeRule"]
-    resources = ["arn:aws:events:${var.region}:${data.aws_caller_identity.actual.account_id}:rule/StepFunctionsGetEventsForGlueJobRule"]
   }
 }
 

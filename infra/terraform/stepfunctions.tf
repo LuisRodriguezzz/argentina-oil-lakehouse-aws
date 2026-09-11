@@ -1,49 +1,73 @@
 # Una máquina de estados por pipeline: los pasos en orden, y si uno falla no arranca el
 # siguiente. Los jobs de Glue son genéricos y se reutilizan; lo único que cambia entre
-# pipelines es el dataset, el contrato, qué job hace bronze y el cron.
+# pipelines es el dataset, los contratos, qué job hace bronze y el cron.
 #
 # `startJobRun.sync` espera a que el job termine y falla si el job falla.
 #
 # Cada paso mezcla sus argumentos fijos con los que traiga el input de la ejecución (JSONata):
 # con input `{}` corre el pipeline completo, y con
-#   {"ingesta": {"--only": "^Padr"}, "silver": {"--contract": "pozo_primera_produccion"}}
-# se acota la corrida sin tocar la definición.
+#   {"ingesta": {"--only": "^Padr"}}
+# se acota la corrida sin tocar la definición. Las claves del input son los nombres de los
+# estados: `ingesta`, `bronze` y un `silver_<contrato>` por contrato del pipeline.
 
 locals {
   pipelines = {
     produccion_pozo_mensual = {
-      dataset    = "produccion_pozo"
-      contract   = "produccion_pozo"
+      dataset = "produccion_pozo"
+      # Dos contratos sobre el mismo dataset: las DDJJ de producción y el padrón de pozos,
+      # que bronze separa en dos tablas (pipelines/spark_jobs/bronze_tables.yaml) y que gold
+      # necesita como dimensión. Se cargan en este orden, uno después del otro.
+      contracts  = ["produccion_pozo", "pozo_primera_produccion"]
       bronze_job = aws_glue_job.bronze_load.name
       # Mensual, el día 1 a las 6: el portal republica el CSV una vez por mes.
       cron = "cron(0 6 1 * ? *)"
     }
     fractura_diaria = {
       dataset    = "fractura"
-      contract   = "fractura"
+      contracts  = ["fractura"]
       bronze_job = aws_glue_job.bronze_load.name
       # Diario a las 7: el portal republica el CSV de fractura todos los días.
       cron = "cron(0 7 * * ? *)"
     }
     reservas_mensual = {
-      dataset  = "reservas"
-      contract = "reservas"
+      dataset   = "reservas"
+      contracts = ["reservas"]
       # El único pipeline cuyo bronze no es Spark: el ZIP anual es un cuadro de Excel y lo
       # parsea un Python shell (glue.tf). El `--dataset` de abajo le llega igual y lo ignora,
       # porque este job carga una sola tabla.
       bronze_job = aws_glue_job.bronze_reservas.name
-      # Mensual el día 1 a las 6: la Secretaría publica el ZIP una vez al año, pero mirarlo
-      # todos los meses no cuesta nada (el hash decide si hay algo que cargar).
-      cron = "cron(0 6 1 * ? *)"
+      # Mensual el día 1 a las 9: la Secretaría publica el ZIP una vez al año, pero mirarlo
+      # todos los meses no cuesta nada (el hash decide si hay algo que cargar). Tres horas
+      # después de producción, que arranca a las 6 y comparte los jobs de ingesta y silver.
+      cron = "cron(0 9 1 * ? *)"
     }
   }
 
-  # Argumentos fijos de cada paso, por pipeline.
-  fijos = { for nombre, pipeline in local.pipelines : nombre => {
-    ingesta = { "--dataset" = pipeline.dataset }
-    bronze  = { "--dataset" = pipeline.dataset }
-    silver  = { "--contract" = pipeline.contract }
-  } }
+  # Los jobs de Glue corren de a uno y se comparten entre pipelines: si dos máquinas se
+  # cruzan, la segunda falla al instante con ConcurrentRunsExceededException en vez de hacer
+  # cola. Reintentar cada 5 minutos sin backoff da casi una hora de espera, que alcanza para
+  # que termine la corrida que estaba ocupando el job.
+  reintentar_si_el_job_esta_ocupado = [{
+    ErrorEquals     = ["Glue.ConcurrentRunsExceededException"]
+    IntervalSeconds = 300
+    MaxAttempts     = 10
+    BackoffRate     = 1
+  }]
+
+  # Un estado de silver por contrato. El nombre lleva el contrato adentro para poder acotar
+  # la corrida a uno solo desde el input de la ejecución.
+  estados_silver = { for nombre, pipeline in local.pipelines :
+    nombre => [for contrato in pipeline.contracts : "silver_${contrato}"]
+  }
+
+  # Argumentos fijos de cada paso, por pipeline. La clave es el nombre del estado.
+  fijos = { for nombre, pipeline in local.pipelines : nombre => merge(
+    {
+      ingesta = { "--dataset" = pipeline.dataset }
+      bronze  = { "--dataset" = pipeline.dataset }
+    },
+    { for contrato in pipeline.contracts : "silver_${contrato}" => { "--contract" = contrato } },
+  ) }
 
   # `$states.context.Execution.Input` y no `$states.input`: el input de un paso es la salida
   # del paso anterior (la corrida de Glue), no el input de la ejecución.
@@ -51,6 +75,23 @@ locals {
   # con QueryEvaluationError en vez de omitir el campo.
   argumentos = { for nombre, pasos in local.fijos : nombre => { for paso, fijos in pasos :
     paso => "{% $merge([${jsonencode(fijos)}, $exists($states.context.Execution.Input.${paso}) ? $states.context.Execution.Input.${paso} : {}]) %}"
+  } }
+
+  # Los estados de silver ya armados: cada uno encadena con el contrato siguiente y el
+  # último cierra la máquina.
+  silver = { for nombre, estados in local.estados_silver : nombre => {
+    for i, estado in estados : estado => merge(
+      {
+        Type     = "Task"
+        Resource = "arn:aws:states:::glue:startJobRun.sync"
+        Retry    = local.reintentar_si_el_job_esta_ocupado
+        Arguments = {
+          JobName   = aws_glue_job.silver_load.name
+          Arguments = local.argumentos[nombre][estado]
+        }
+      },
+      i == length(estados) - 1 ? { End = true } : { Next = estados[i + 1] },
+    )
   } }
 
   # Gold no es un pipeline de fuente: no ingiere ni tipa nada, corre un solo job que arma los
@@ -61,35 +102,31 @@ locals {
       Comment       = "${pipeline.dataset}: landing -> bronze -> silver"
       QueryLanguage = "JSONata"
       StartAt       = "ingesta"
-      States = {
-        ingesta = {
-          Type     = "Task"
-          Resource = "arn:aws:states:::glue:startJobRun.sync"
-          Arguments = {
-            JobName   = aws_glue_job.ingest_landing.name
-            Arguments = local.argumentos[nombre]["ingesta"]
+      States = merge(
+        {
+          ingesta = {
+            Type     = "Task"
+            Resource = "arn:aws:states:::glue:startJobRun.sync"
+            Retry    = local.reintentar_si_el_job_esta_ocupado
+            Arguments = {
+              JobName   = aws_glue_job.ingest_landing.name
+              Arguments = local.argumentos[nombre]["ingesta"]
+            }
+            Next = "bronze"
           }
-          Next = "bronze"
-        }
-        bronze = {
-          Type     = "Task"
-          Resource = "arn:aws:states:::glue:startJobRun.sync"
-          Arguments = {
-            JobName   = pipeline.bronze_job
-            Arguments = local.argumentos[nombre]["bronze"]
+          bronze = {
+            Type     = "Task"
+            Resource = "arn:aws:states:::glue:startJobRun.sync"
+            Retry    = local.reintentar_si_el_job_esta_ocupado
+            Arguments = {
+              JobName   = pipeline.bronze_job
+              Arguments = local.argumentos[nombre]["bronze"]
+            }
+            Next = local.estados_silver[nombre][0]
           }
-          Next = "silver"
-        }
-        silver = {
-          Type     = "Task"
-          Resource = "arn:aws:states:::glue:startJobRun.sync"
-          Arguments = {
-            JobName   = aws_glue_job.silver_load.name
-            Arguments = local.argumentos[nombre]["silver"]
-          }
-          End = true
-        }
-      }
+        },
+        local.silver[nombre],
+      )
     } },
     {
       gold_mensual = {
@@ -100,6 +137,7 @@ locals {
           gold = {
             Type      = "Task"
             Resource  = "arn:aws:states:::glue:startJobRun.sync"
+            Retry     = local.reintentar_si_el_job_esta_ocupado
             Arguments = { JobName = aws_glue_job.gold_dbt.name }
             End       = true
           }
@@ -108,10 +146,12 @@ locals {
     },
   )
 
-  # El día 1 a las 6, como los pipelines de fuente.
+  # Escalonados a propósito: los cuatro comparten jobs que corren de a uno, así que arrancar
+  # todos a la misma hora sería pelearse por ellos. Gold va al mediodía del día 1, cuando los
+  # tres pipelines de fuente ya terminaron.
   crons = merge(
     { for nombre, pipeline in local.pipelines : nombre => pipeline.cron },
-    { gold_mensual = "cron(0 6 1 * ? *)" },
+    { gold_mensual = "cron(0 12 1 * ? *)" },
   )
 }
 

@@ -13,10 +13,13 @@ gold con dbt.
 | `silver_load` | Glue 5.0 Spark, N × G.1X | Aplica un contrato y escribe la tabla silver. |
 | `gold_dbt` | Glue 5.0, N × G.1X | `dbt build`; el SQL lo ejecuta Athena. |
 
-Los cuatro primeros son genéricos: no tienen dataset ni contrato en sus argumentos por
-defecto, se los pasa la máquina de estados. Cada pipeline es una entrada del mapa
-`local.pipelines` de `stepfunctions.tf` con su dataset, su contrato, **qué job usa para
-bronze** y su cron: agregar uno nuevo son seis líneas, no otra definición de estados.
+`ingest_landing`, `bronze_load` y `silver_load` son genéricos: no tienen dataset ni contrato
+en sus argumentos por defecto, se los pasa la máquina de estados. `bronze_reservas` recibe el
+`--dataset` igual pero lo ignora, porque carga una sola tabla. Cada pipeline es una entrada del
+mapa `local.pipelines` de `stepfunctions.tf` con su dataset, **sus contratos**, qué job usa
+para bronze y su cron: agregar uno nuevo son seis líneas, no otra definición de estados. Un
+pipeline con más de un contrato (producción carga también el padrón de pozos) genera un estado
+`silver_<contrato>` por contrato, encadenados.
 
 ## Ambientes
 
@@ -39,10 +42,14 @@ tiene que coincidir con el ambiente del tfvars: `aws_s3_bucket.lakehouse` lleva 
 `precondition` que corta el plan si no coinciden, con el comando que hay que correr.
 
 El sufijo llega al código por una sola variable de entorno, `GLUE_DATABASE_SUFFIX`, que
-Terraform pasa como argumento a cada job. Los jobs de Spark la aplican con
-`bronze_rules.with_suffix` sobre los nombres que leen de los YAML de contratos, y dbt la
-compone en `profiles.yml` (`schema: "gold{{ env_var('GLUE_DATABASE_SUFFIX', '') }}"`) y en
-`models/sources.yml`.
+Terraform pasa como argumento a cada job. La consumen tres lugares:
+
+- los jobs de Spark, con `bronze_rules.with_suffix` sobre los nombres de tabla que leen de los
+  YAML de contratos;
+- `pipelines/reservas/bronze_load.py`, que compone el namespace a mano porque el nombre de su
+  tabla es una constante del módulo y no sale de ningún YAML;
+- dbt, en `profiles.yml` (`schema: "gold{{ env_var('GLUE_DATABASE_SUFFIX', '') }}"`) y en
+  `models/sources.yml`.
 
 El state es **local** todavía, un archivo por workspace en `terraform.tfstate.d/`. El bloque
 de backend S3 está escrito y comentado en `versions.tf`, y el bucket y la tabla de locks
@@ -59,9 +66,9 @@ terraform apply -var-file=envs\dev.tfvars      # 29 recursos
 ..\..\scripts\aws_deploy.ps1                   # uv build + sube wheel y wrappers a artifacts/
 ```
 
-`aws_deploy.ps1` lee el bucket y el ambiente de `terraform output` **del workspace
-seleccionado**: publica en el ambiente en el que uno esté parado, y lo imprime antes de subir
-nada. Los jobs leen su script de `s3://<bucket>/artifacts/` en cada corrida: después de tocar
+`aws_deploy.ps1` (y `aws_deploy.sh`, el mismo script para Git Bash y Linux) lee el bucket y el
+ambiente de `terraform output` **del workspace seleccionado**: publica en el ambiente en el que
+uno esté parado, y lo imprime antes de subir nada. Los jobs leen su script de `s3://<bucket>/artifacts/` en cada corrida: después de tocar
 código alcanza con volver a correrlo, sin `terraform apply`. Si cambia la versión del
 proyecto, actualizar también la variable `wheel_name`.
 
@@ -96,8 +103,11 @@ habilitarlo están en [`bootstrap/README.md`](bootstrap/README.md).
 $arn = (terraform output -json state_machine_arns | ConvertFrom-Json).fractura_diaria
 # Corrida completa (el dataset y el contrato los pone la máquina de estados)
 aws stepfunctions start-execution --state-machine-arn $arn --input '{}'
-# Corrida acotada: se mezcla con los argumentos fijos del pipeline, no los reemplaza
-aws stepfunctions start-execution --state-machine-arn $arn --input '{\"ingesta\":{\"--only\":\"^Padr\"},\"silver\":{\"--contract\":\"pozo_primera_produccion\"}}'
+# Corrida acotada: se mezcla con los argumentos fijos de cada paso, no los reemplaza. Las
+# claves son nombres de estados (`ingesta`, `bronze`, `silver_<contrato>`).
+aws stepfunctions start-execution --state-machine-arn $arn --input '{\"ingesta\":{\"--only\":\"^Padr\"}}'
+# Reprocesar un recurso suelto, sin la máquina de estados (bronze, silver y reservas)
+aws glue start-job-run --job-name silver_load_dev --arguments '{"--contract":"fractura","--resource-id":"..."}'
 
 aws stepfunctions describe-execution --execution-arn <arn de la ejecución>
 aws glue get-job-runs --job-name bronze_load_prod --max-items 1
@@ -107,12 +117,15 @@ aws glue get-job-runs --job-name bronze_load_prod --max-items 1
 Las claves de `state_machine_arns` son los nombres sin sufijo (`fractura_diaria`) aunque la
 máquina se llame `fractura_diaria_prod`: así estos comandos valen igual en los dos ambientes.
 Los pipelines son `produccion_pozo_mensual`, `fractura_diaria`, `reservas_mensual` y
-`gold_mensual`. Los jobs de Glue admiten una corrida a la vez, así que dos pipelines de
-fuente no pueden ir en paralelo: comparten `ingest_landing` y `silver_load`.
+`gold_mensual`. Los jobs compartidos corren de a uno y el pipeline que llega segundo espera y
+reintenta ([ADR 0001](../../docs/adr/0001-lakehouse-serverless-en-aws.md)).
 
 Los schedules de EventBridge (uno por máquina) existen pero nacen **deshabilitados** en los
 dos ambientes: nada queda corriendo solo y el costo en reposo es cero. Para habilitarlos,
-cambiar `enable_schedule` en el tfvars del ambiente y volver a aplicar.
+cambiar `enable_schedule` en el tfvars del ambiente y volver a aplicar. Están escalonados para
+no pelearse por los jobs compartidos: producción el día 1 a las 6, fractura todos los días a
+las 7, reservas el día 1 a las 9 y gold el día 1 a las 12, cuando las tres fuentes ya
+terminaron.
 
 ## Consultar en Athena
 
