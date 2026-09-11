@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: dim_empresa
+    description: >
+      Empresas del upstream, unificadas de las tres fuentes que las nombran distinto:
+      producción dice `empresa`, fractura `empresa_informante` y reservas `operador`. El nombre
+      se normaliza (mayúsculas, sin espacios de más) y la clave surrogate es el hash de esa
+      forma normalizada, así la misma compañía cae en la misma fila venga de donde venga.
+
+    columns:
+      - name: empresa_key
+        description: "Clave surrogate: md5 del nombre normalizado. Estable entre corridas."
+        data_tests: [unique, not_null]
+
+      - name: empresa
+        description: "Razón social normalizada (mayúsculas, espacios colapsados)."
+        data_tests: [unique, not_null]
+
+      - name: es_ypf
+        description: >
+          Verdadero si el nombre empieza con YPF: incluye a YPF S.A. y a las controladas del
+          grupo. Es el filtro del que cuelga casi todo el análisis del proyecto.
+        data_tests: [not_null]

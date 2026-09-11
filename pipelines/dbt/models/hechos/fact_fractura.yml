@@ -1,0 +1,123 @@
+version: 2
+
+models:
+  - name: fact_fractura
+    description: >
+      Una fila por operación de fractura declarada en el Adjunto IV: cómo se estimuló el pozo.
+      Es el lado "diseño" del que `fact_produccion_mensual` cuenta el resultado. El grano es la
+      declaración y no el pozo: un pozo puede tener varias, hasta 6 el mismo día, porque las
+      etapas se declaran por separado.
+
+    columns:
+      - name: id_base_fractura_adjiv
+        description: "Identificador de la declaración en la base del Adjunto IV. Es el grano de la tabla."
+        data_tests: [unique, not_null]
+
+      - name: idpozo
+        description: "Pozo fracturado; cruza con `fact_produccion_mensual.idpozo`."
+        data_tests: [not_null]
+
+      - name: pozo_key
+        description: >
+          Clave del tramo de dim_pozo vigente el día que arrancó el tratamiento: el estado del
+          pozo en el momento de la fractura, no el de hoy. Nula si el pozo nunca declaró
+          producción (se fracturó pero todavía no produce).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_pozo')
+                field: pozo_key
+
+      - name: empresa_key
+        description: "Clave de la operadora que declara la fractura."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_empresa')
+                field: empresa_key
+
+      - name: fecha_key
+        description: "Clave del mes de inicio de la fractura."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+
+      - name: anio
+        description: "Año de inicio de la fractura."
+        data_tests: [not_null]
+
+      - name: sigla
+        description: "Sigla del pozo tal como la declaró la operadora."
+
+      - name: cuenca
+        description: "Cuenca sedimentaria declarada en la fractura."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["NEUQUINA", "GOLFO SAN JORGE", "AUSTRAL"]
+
+      - name: yacimiento
+        description: "Yacimiento declarado en la fractura."
+
+      - name: formacion_productiva
+        description: "Formación estimulada; el portal la publica en minúsculas (`vaca muerta`)."
+
+      - name: tipo_reservorio
+        description: "Tipo de reservorio; separa el no convencional del convencional."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["CONVENCIONAL", "NO CONVENCIONAL", "NO DISCRIMINADO"]
+
+      - name: subtipo_reservorio
+        description: "Subtipo del no convencional; vacío cuando el reservorio es convencional."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["SHALE", "TIGHT"]
+
+      - name: tipo_terminacion
+        description: "Método de terminación (Tapón disparo, Punzado, Camisas deslizables, Jetteo)."
+
+      - name: fecha_inicio_fractura
+        description: "Fecha de inicio del tratamiento; es la fecha de referencia del registro."
+        data_tests: [not_null]
+
+      - name: fecha_fin_fractura
+        description: "Fecha de fin del tratamiento."
+
+      - name: duracion_dias
+        description: >
+          Días entre inicio y fin. Nula en las 41 filas que declaran un fin anterior al inicio
+          (ver docs/fuentes/fractura.md): una duración negativa sería un número inventado.
+
+      - name: longitud_rama_horizontal_m
+        description: "Longitud de la rama horizontal en metros; 0 en los pozos verticales, que son 2.054."
+
+      - name: cantidad_fracturas
+        description: "Etapas de fractura bombeadas en el tratamiento."
+
+      - name: arena_bombeada_nacional_tn
+        description: "Agente de sostén de origen nacional bombeado, en toneladas."
+
+      - name: arena_bombeada_importada_tn
+        description: "Agente de sostén importado bombeado, en toneladas."
+
+      - name: arena_bombeada_total_tn
+        description: "Suma de arena nacional e importada; una de las dos vacía no anula el total."
+
+      - name: agua_inyectada_m3
+        description: "Agua bombeada en el tratamiento, en m3."
+
+      - name: co2_inyectado_m3
+        description: "CO2 inyectado en el tratamiento, en m3."
+
+      - name: presion_maxima_psi
+        description: "Presión máxima de tratamiento en psi. El contrato de silver ya mandó a cuarentena las 12 filas por encima de 20.000."
+
+      - name: potencia_equipos_fractura_hp
+        description: "Potencia hidráulica del set de bombeo, en HP."

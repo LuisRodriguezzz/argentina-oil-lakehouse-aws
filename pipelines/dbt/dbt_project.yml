@@ -1,0 +1,21 @@
+name: gold
+version: 1.0.0
+config-version: 2
+profile: gold
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+models:
+  gold:
+    # Todo gold son tablas Iceberg en Parquet, igual que bronze y silver: las escribe Athena
+    # y las lee cualquier motor del catálogo de Glue.
+    +table_type: iceberg
+    +format: parquet
+    dimensiones:
+      +materialized: table
+    hechos:
+      +materialized: table
+    marts:
+      +materialized: table

@@ -1,0 +1,37 @@
+version: 2
+
+models:
+  - name: dim_yacimiento
+    description: >
+      Un yacimiento por fila con su última descripción conocida. Los nombres de área, cuenca y
+      concesión se redeclaran en cada DDJJ y a veces cambian (se renombra un área, se transfiere
+      una concesión): se guarda la última observación, que es la vigente. No es una dimensión
+      con historia; la historia del pozo, que es la que importa, vive en dim_pozo.
+
+    columns:
+      - name: yacimiento_key
+        description: "Clave surrogate: md5 de `idareayacimiento`."
+        data_tests: [unique, not_null]
+
+      - name: idareayacimiento
+        description: "Código del yacimiento en el registro de la Secretaría."
+        data_tests: [unique, not_null]
+
+      - name: areayacimiento
+        description: "Nombre del yacimiento en su última declaración."
+
+      - name: cuenca
+        description: >
+          Cuenca sedimentaria, en mayúsculas: GOLFO SAN JORGE, NEUQUINA, AUSTRAL, CUYANA,
+          NOROESTE y unas pocas filas en NORESTE, ÑIRIHUAU y CAÑADON ASFALTO. Sin
+          `accepted_values`: el contrato de silver no cierra este dominio, así que una cuenca
+          nueva es un dato válido y no una falla de calidad.
+
+      - name: provincia
+        description: "Provincia donde está el yacimiento."
+
+      - name: idareapermisoconcesion
+        description: "Código del área de permiso o concesión a la que pertenece."
+
+      - name: areapermisoconcesion
+        description: "Nombre del área de permiso o concesión."

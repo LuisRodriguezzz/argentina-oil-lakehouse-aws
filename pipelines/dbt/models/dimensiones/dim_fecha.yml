@@ -1,0 +1,49 @@
+version: 2
+
+models:
+  - name: dim_fecha
+    description: >
+      Calendario mensual del lakehouse: una fila por año-mes desde 2006 (primer año de la serie
+      de producción) hasta diciembre del año en curso. No sale de los datos, se genera con
+      `sequence`: así no tiene agujeros aunque un mes no traiga declaraciones.
+
+      Llega hasta fin de año y no hasta el mes de hoy porque las fuentes traen fechas futuras:
+      tres fracturas del Adjunto IV declaran inicio en octubre, noviembre y diciembre de 2026
+      con el día y el mes invertidos (ids 5489-5491, ver docs/fuentes/fractura.md). El test
+      `relationships` de `fact_fractura.fecha_key` fue justamente el que lo encontró.
+
+    columns:
+      - name: fecha_key
+        description: "Clave del mes, `anio * 100 + mes` (202401 es enero de 2024). Es la clave que usan los hechos."
+        data_tests: [unique, not_null]
+
+      - name: anio
+        description: "Año calendario."
+        data_tests: [not_null]
+
+      - name: mes
+        description: "Mes calendario, de 1 a 12."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+                quote: false
+
+      - name: trimestre
+        description: "Trimestre del año, de 1 a 4."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4]
+                quote: false
+
+      - name: anio_mes
+        description: "El mes como texto ordenable, `yyyy-MM`. Para ejes de gráficos y filtros."
+
+      - name: primer_dia
+        description: "Primer día del mes; es la fecha con la que se comparan las vigencias de dim_pozo."
+        data_tests: [not_null]
+
+      - name: ultimo_dia
+        description: "Último día del mes."

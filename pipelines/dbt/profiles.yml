@@ -1,0 +1,26 @@
+# Perfil versionado con el repo: no tiene secretos. Todo lo que depende de la cuenta llega por
+# entorno, que es lo que exporta pipelines/aws/gold_dbt_job.py desde los argumentos del job de
+# Glue, y el permiso para leer y escribir lo da el rol de ese job.
+
+gold:
+  target: aws
+
+  outputs:
+    # dbt-athena no necesita ningún motor propio: manda SQL a Athena, que lee y escribe las
+    # mismas tablas Iceberg del Glue Data Catalog que bronze y silver (ADR 0003).
+    aws:
+      type: athena
+      region_name: "{{ env_var('AWS_REGION') }}"
+      work_group: "{{ env_var('ATHENA_WORKGROUP') }}"
+      database: "{{ env_var('ATHENA_DATABASE') }}"
+      # La base de Glue lleva el sufijo del ambiente (`gold_dev`, `gold_prod`) porque dev y
+      # prod comparten cuenta y el catálogo no admite dos bases `gold` (ADR 0005). El valor lo
+      # pone Terraform como argumento del job; el default vacío deja correr `dbt parse` fuera
+      # del job, donde no hay ambiente.
+      schema: "gold{{ env_var('GLUE_DATABASE_SUFFIX', '') }}"
+      # Resultados de las consultas (descartables) y datos de las tablas (no). Van a prefijos
+      # distintos a propósito: athena-results/ se vacía a los 7 días por regla de ciclo de
+      # vida del bucket y ahí adentro gold duraría una semana.
+      s3_staging_dir: "{{ env_var('S3_STAGING_DIR') }}"
+      s3_data_dir: "{{ env_var('S3_DATA_DIR') }}"
+      threads: 4 # el que ejecuta es Athena: el job solo manda consultas y espera

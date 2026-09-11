@@ -1,0 +1,99 @@
+version: 2
+
+models:
+  - name: dim_pozo
+    description: >
+      Dimensión de pozos con historia (SCD tipo 2): una fila por cada tramo de meses en que los
+      atributos rastreados del pozo no cambiaron. Un pozo que pasó de "Extracción Efectiva" a
+      "Abandonado" y volvió deja tres filas, cada una con su ventana de vigencia, y un hecho de
+      2014 se cuelga del tramo que estaba vigente en 2014 y no del de hoy.
+
+      Los ocho atributos rastreados son `empresa`, `tipoestado`, `tipopozo`, `tipoextraccion`,
+      `tipo_de_recurso`, `sub_tipo_recurso`, `formacion` e `idareayacimiento`. `sigla` y
+      `profundidad` no se rastrean: se guarda el último valor observado dentro del tramo.
+
+      **Por qué con ventanas y no con `dbt snapshot`.** Un snapshot sirve para capturar cambios
+      que llegan de a uno, comparando la foto de hoy contra la anterior y agregando una fila
+      cuando algo se movió. Acá no hace falta: silver tiene el histórico mensual completo desde
+      2006, con los 21 años de cambios ya escritos. Se reconstruye de una sola pasada con la
+      receta clásica: `lag` para detectar el mes en que la huella de atributos cambia y una suma
+      acumulada de esos cambios para numerar los tramos. La ventaja práctica es que la dimensión
+      es reproducible: se puede borrar y volver a calcular idéntica, cosa que un snapshot, que
+      depende de cuándo corrió, no permite.
+
+      **Huecos de meses.** Si un pozo deja de declarar y vuelve con los mismos atributos, sigue
+      siendo el mismo tramo. Lo que la dimensión rastrea son los cambios de atributo, no la
+      continuidad de la declaración.
+
+    columns:
+      - name: pozo_key
+        description: "Clave surrogate del tramo: md5 de `idpozo` más `vigente_desde`. Es la clave a la que apuntan los hechos."
+        data_tests: [unique, not_null]
+
+      - name: idpozo
+        description: "Identificador del pozo en el registro de la Secretaría. Se repite: hay una fila por tramo."
+        data_tests: [not_null]
+
+      - name: sigla
+        description: "Sigla del pozo, el identificador legible de la industria. Último valor del tramo."
+
+      - name: empresa
+        description: "Razón social de la operadora que declaraba en el tramo. Atributo rastreado."
+
+      - name: empresa_key
+        description: "Clave hacia dim_empresa, calculada con el mismo hash que la dimensión."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_empresa')
+                field: empresa_key
+
+      - name: tipoestado
+        description: "Estado del pozo en el tramo (Extracción Efectiva, Abandonado, etc.). Atributo rastreado."
+
+      - name: tipopozo
+        description: "Destino del pozo (Petrolífero, Gasífero, Inyección de Agua, etc.). Atributo rastreado."
+
+      - name: tipoextraccion
+        description: "Sistema de extracción declarado. Atributo rastreado."
+
+      - name: tipo_de_recurso
+        description: "Tipo de recurso; separa Vaca Muerta del convencional. Atributo rastreado."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["CONVENCIONAL", "NO CONVENCIONAL", "SIN RESERVORIO", "NO DISCRIMINADO"]
+
+      - name: sub_tipo_recurso
+        description: "Subtipo del no convencional (SHALE, TIGHT); vacío en el convencional. Atributo rastreado."
+
+      - name: formacion
+        description: "Nombre de la formación productiva. Atributo rastreado."
+
+      - name: idareayacimiento
+        description: "Código del yacimiento en el tramo. Atributo rastreado: una transferencia de área abre un tramo nuevo."
+
+      - name: yacimiento_key
+        description: "Clave hacia dim_yacimiento."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_yacimiento')
+                field: yacimiento_key
+
+      - name: profundidad
+        description: "Profundidad del pozo en metros. Último valor del tramo, no rastreado."
+
+      - name: primera_produccion
+        description: "Primer día del mes de la primera producción del pozo, del padrón de Capítulo IV. Nula si el pozo no figura en el padrón."
+
+      - name: vigente_desde
+        description: "Primer día del primer mes del tramo."
+        data_tests: [not_null]
+
+      - name: vigente_hasta
+        description: "Último día del último mes del tramo. Nula en el tramo vigente, que todavía no tiene cierre."
+
+      - name: es_vigente
+        description: "Verdadero en el último tramo del pozo. Filtrar por acá da una fila por pozo con su estado actual."
+        data_tests: [not_null]

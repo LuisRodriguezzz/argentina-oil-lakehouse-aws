@@ -1,0 +1,91 @@
+version: 2
+
+models:
+  - name: fact_produccion_mensual
+    description: >
+      Hecho central del modelo: una fila por pozo y mes declarado, con las medidas de producción
+      e inyección y las claves hacia las cuatro dimensiones. Grano idéntico al de
+      `silver.produccion_pozo`, del que hereda 18,2 M filas y 21 años.
+
+      Tabla Iceberg particionada por `anio`, igual que su origen: una consulta por año lee un
+      solo directorio. Se materializa completa y no incremental a propósito: silver reescribe
+      particiones enteras cuando un recurso cambia de sha256 —y las rectificativas corrigen años
+      viejos—, así que un incremental que solo agregue el mes nuevo se perdería esas
+      correcciones. Reconstruirla cuesta unos minutos, menos que el riesgo de quedar
+      desincronizada.
+
+    columns:
+      - name: pozo_key
+        description: "Clave del tramo de dim_pozo vigente en ese mes, resuelta por rango de vigencia."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_pozo')
+                field: pozo_key
+
+      - name: fecha_key
+        description: "Clave del mes declarado, `anio * 100 + mes`."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+
+      - name: empresa_key
+        description: "Clave de la empresa que declaró el mes."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_empresa')
+                field: empresa_key
+
+      - name: yacimiento_key
+        description: "Clave del yacimiento declarado. Nula cuando la DDJJ no trae `idareayacimiento`."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_yacimiento')
+                field: yacimiento_key
+
+      - name: idpozo
+        description: "Identificador del pozo; se conserva para cruzar con las fuentes sin pasar por la dimensión."
+        data_tests: [not_null]
+
+      - name: anio
+        description: "Año de la declaración jurada. Es la columna de partición."
+        data_tests: [not_null]
+
+      - name: mes
+        description: "Mes de la declaración jurada, de 1 a 12."
+        data_tests: [not_null]
+
+      - name: prod_pet
+        description: "Producción de petróleo del mes, en m3."
+
+      - name: prod_gas
+        description: "Producción de gas del mes, en Mm3 (miles de m3)."
+
+      - name: prod_agua
+        description: "Producción de agua del mes, en m3."
+
+      - name: iny_agua
+        description: "Inyección de agua del mes, en m3 (recuperación secundaria)."
+
+      - name: iny_gas
+        description: "Inyección de gas del mes, en Mm3."
+
+      - name: iny_co2
+        description: "Inyección de CO2 del mes, en Mm3."
+
+      - name: iny_otro
+        description: "Inyección de otros fluidos del mes."
+
+      - name: tef
+        description: "Horas efectivas de producción en el mes; 744 son 31 días por 24 horas."
+
+      - name: meses_desde_primera_produccion
+        description: >
+          Edad del pozo en meses: 0 es el mes de su primera producción. Nula si el pozo no
+          figura en el padrón de Capítulo IV, que no cubre a todos los que declaran.

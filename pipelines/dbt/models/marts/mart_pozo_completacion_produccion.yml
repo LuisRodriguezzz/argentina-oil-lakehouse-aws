@@ -1,0 +1,118 @@
+version: 2
+
+models:
+  - name: mart_pozo_completacion_produccion
+    description: >
+      Tabla ancha de análisis: un pozo fracturado por fila, con el diseño de su completación
+      de un lado y lo que produjo en sus primeros meses del otro. Es la forma en que se plantea
+      la pregunta del proyecto: cuánto de la productividad temprana se explica por cómo se
+      estimuló el pozo.
+
+      Solo entran pozos con al menos una fractura declarada. De las varias declaraciones que
+      puede tener un pozo se toma la última, que es la que describe cómo quedó terminado. Los
+      acumulados pueden venir nulos: un pozo fracturado hace tres meses todavía no tiene 12
+      meses de historia, y uno que no figura en el padrón de primera producción no tiene desde
+      cuándo contar.
+
+      Está a nivel pozo y no a nivel pozo-mes a propósito: una fila por unidad de observación
+      es lo que se necesita para comparar un pozo con otro.
+
+    columns:
+      - name: pozo_key
+        description: "Clave del tramo vigente de dim_pozo. Nula si el pozo nunca declaró producción."
+
+      - name: idpozo
+        description: "Identificador del pozo. Es el grano de la tabla."
+        data_tests: [unique, not_null]
+
+      - name: sigla
+        description: "Sigla del pozo, el identificador legible de la industria."
+
+      - name: empresa
+        description: "Operadora actual del pozo, normalizada."
+
+      - name: empresa_key
+        description: "Clave hacia dim_empresa."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_empresa')
+                field: empresa_key
+
+      - name: cuenca
+        description: "Cuenca del yacimiento actual del pozo."
+
+      - name: provincia
+        description: "Provincia del yacimiento actual del pozo."
+
+      - name: areayacimiento
+        description: "Nombre del yacimiento actual del pozo."
+
+      - name: formacion
+        description: "Formación productiva actual (Vaca Muerta, etc.)."
+
+      - name: tipo_de_recurso
+        description: "Convencional o no convencional, según la última declaración del pozo."
+
+      - name: sub_tipo_recurso
+        description: "SHALE o TIGHT en el no convencional."
+
+      - name: profundidad
+        description: "Profundidad del pozo en metros."
+
+      - name: primera_produccion
+        description: "Primer día del mes de la primera producción. Es el origen de los acumulados."
+
+      - name: fecha_inicio_fractura
+        description: "Inicio de la última fractura declarada del pozo."
+        data_tests: [not_null]
+
+      - name: tipo_terminacion
+        description: "Método de terminación de la última fractura."
+
+      - name: longitud_rama_horizontal_m
+        description: "Longitud de la rama horizontal, en metros. 0 en los pozos verticales."
+
+      - name: cantidad_fracturas
+        description: "Etapas de fractura bombeadas en la última fractura. Es la medida de intensidad de la completación."
+
+      - name: arena_bombeada_total_tn
+        description: "Agente de sostén total (nacional más importado), en toneladas."
+
+      - name: agua_inyectada_m3
+        description: "Agua bombeada en la última fractura, en m3."
+
+      - name: co2_inyectado_m3
+        description: "CO2 inyectado en la última fractura, en m3."
+
+      - name: presion_maxima_psi
+        description: "Presión máxima de tratamiento, en psi."
+
+      - name: potencia_equipos_fractura_hp
+        description: "Potencia hidráulica del set de bombeo, en HP."
+
+      - name: duracion_dias
+        description: "Días que duró el tratamiento. Nula cuando la declaración trae el fin antes del inicio."
+
+      - name: prod_pet_3m
+        description: "Petróleo acumulado en los primeros 3 meses desde la primera producción, en m3."
+
+      - name: prod_pet_6m
+        description: "Petróleo acumulado en los primeros 6 meses, en m3."
+
+      - name: prod_pet_12m
+        description: "Petróleo acumulado en los primeros 12 meses, en m3. Es la variable a explicar."
+
+      - name: prod_gas_3m
+        description: "Gas acumulado en los primeros 3 meses, en Mm3."
+
+      - name: prod_gas_6m
+        description: "Gas acumulado en los primeros 6 meses, en Mm3."
+
+      - name: prod_gas_12m
+        description: "Gas acumulado en los primeros 12 meses, en Mm3."
+
+      - name: meses_con_declaracion
+        description: >
+          Cuántos de los primeros 12 meses tienen declaración. Sirve para descartar pozos con
+          historia incompleta: 12 es una serie completa.
