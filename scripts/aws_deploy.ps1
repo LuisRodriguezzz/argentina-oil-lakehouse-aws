@@ -36,7 +36,7 @@ $bucket = & $tf -chdir="$terraform" output -raw lakehouse_bucket
 Invoke-O-Fallar "terraform output"
 $destino = "s3://$bucket/artifacts"
 
-Write-Host "== ambiente $ambiente: subiendo a $destino =="
+Write-Host "== ambiente ${ambiente}: subiendo a $destino =="
 & $aws s3 cp $wheel.FullName "$destino/$($wheel.Name)"
 Invoke-O-Fallar "aws s3 cp del wheel"
 # Todos los *_job.py de golpe: un job nuevo no necesita tocar este script.
