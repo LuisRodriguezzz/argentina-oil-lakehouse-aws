@@ -13,8 +13,8 @@ inyección presentada por la operadora. Es el lado "resultado" del que
 
 Medido el 2026-09-06 sobre el CSV anual de 2024 descargado del portal, en el proyecto de
 origen (ADR 0006): **983.710 filas, 38 columnas, 82.379 pozos únicos, 59 empresas**. La tabla
-completa del lakehouse (2006-2026, todos los años con esta misma familia) tiene 18.218.514
-filas (ver README).
+completa del lakehouse (2006-2026, todos los años con esta misma familia) tiene 18.234.202
+filas, medidas en `prod` el 2026-09-12 (ver README).
 
 ## Columnas
 
