@@ -8,26 +8,18 @@ terraform {
     }
   }
 
-  # State local todavía, un archivo por workspace (`terraform.tfstate.d/dev/`,
-  # `terraform.tfstate.d/prod/`). Sigue alcanzando mientras el único que aplica es una
-  # persona desde una sola máquina: un backend remoto pide un bucket y una tabla de locks
-  # que sobreviven al `destroy` (ADR 0001). `*.tfstate` está en el .gitignore del repo.
-  #
-  # El bloque de abajo es lo que hay que descomentar el día que el workflow
-  # `.github/workflows/deploy.yml` tenga que aplicar de verdad: un runner de GitHub arranca
-  # vacío y sin state remoto no sabría qué existe. El bucket y la tabla los crea
-  # `infra/terraform/bootstrap/`, que todavía no se aplicó (ADR 0005).
-  #
-  # `workspace_key_prefix` no hace falta: con workspaces el backend S3 guarda cada uno en
-  # `env:/<workspace>/<key>` solo. Un solo bloque para los dos ambientes.
-  #
-  # backend "s3" {
-  #   bucket         = "oil-lakehouse-tfstate-<id de la cuenta>"
-  #   key            = "lakehouse/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   encrypt        = true
-  #   dynamodb_table = "oil-lakehouse-tfstate-locks"
-  # }
+  # State remoto en el bucket que crea `infra/terraform/bootstrap/` (aplicado el 2026-09-12):
+  # un runner de GitHub arranca vacío y sin esto no sabría qué existe (ADR 0005). Con
+  # workspaces, el backend S3 guarda cada ambiente en `env:/<workspace>/<key>` solo, así que
+  # un único bloque sirve para dev y prod. La tabla de DynamoDB evita que la máquina del
+  # autor y el workflow apliquen a la vez.
+  backend "s3" {
+    bucket         = "oil-lakehouse-tfstate-180111006749"
+    key            = "lakehouse/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "oil-lakehouse-tfstate-locks"
+  }
   #
   # El lock con tabla de DynamoDB es el que entiende cualquier versión de Terraform. Desde
   # la 1.11 hay una alternativa sin tabla, `use_lockfile = true`, que deja el lock como un
