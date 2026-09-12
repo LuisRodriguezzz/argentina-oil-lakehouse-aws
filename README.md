@@ -42,7 +42,7 @@ prendido entre corridas (ADR 0001).
 
 | Fuente | Tabla silver | Filas | Cadencia | Ficha |
 | --- | --- | ---: | --- | --- |
-| Producción de petróleo y gas por pozo (DDJJ) | `silver.produccion_pozo` | 18.218.514 | mensual | [produccion_pozo.md](docs/fuentes/produccion_pozo.md) |
+| Producción de petróleo y gas por pozo (DDJJ) | `silver.produccion_pozo` | 18.234.202 | mensual | [produccion_pozo.md](docs/fuentes/produccion_pozo.md) |
 | Padrón de pozos con primera producción | `silver.pozo_primera_produccion` | 86.197 | mensual | [pozo_primera_produccion.md](docs/fuentes/pozo_primera_produccion.md) |
 | Datos de fractura (Adjunto IV) | `silver.fractura` | 4.878 | diaria | [fractura.md](docs/fuentes/fractura.md) |
 | Reservas y recursos al 31/12 | `silver.reservas` | 198.734 | anual (2020-2024) | [reservas.md](docs/fuentes/reservas.md) |
@@ -97,23 +97,32 @@ Falta un paso previo por ambiente: el parámetro SecureString
 procedimiento completo —desplegar, correr cada pipeline, consultar en Athena, destruir y
 reconstruir de cero— está en el runbook [`infra/terraform/README.md`](infra/terraform/README.md).
 
-**Costos medidos** el 2026-09-06 en el proyecto de origen con este mismo código
-([ADR 0006](docs/adr/0006-origen-y-alcance.md)):
+**Tiempos medidos** en `prod` el 2026-09-12, cargando los 21 años desde cero:
 
-- **Reconstruir el entorno entero desde cero** —los cuatro pipelines, incluidas las descargas—
-  cuesta **menos de 2 USD** y tarda alrededor de una hora, casi toda esperando a que la ingesta
-  baje los CSV.
-- El job de gold (`dbt build` sobre Athena) son **0,15 USD por corrida**.
+| Paso | Job | Duración |
+| --- | --- | --- |
+| Ingesta de producción (24 archivos, 5,96 GB) | Python shell, 1/16 DPU | 49 min |
+| Bronze de producción | Spark, 4 workers | 7 min |
+| Silver de producción + padrón | Spark, 4 workers | 19 + 2 min |
+| Fractura y reservas, máquinas completas | | 6 y 5 min |
+| Gold (8 modelos, 81 tests sobre Athena) | Glue 5.0, 2 workers | 4 min |
+
+Casi todo el tiempo es la descarga del portal. El costo de esa reconstrucción completa fue de
+**menos de 2 USD** (el mismo orden que midió el proyecto de origen), con gold en unos 0,15 USD.
 - **En reposo, cero**: no hay NAT Gateway, ni RDS, ni EMR, ni un entorno de orquestación
   administrado, y los schedules de EventBridge nacen deshabilitados.
 
 ## Resultados
 
-- **18.218.514 filas** de producción mensual por pozo (2006-2026) cargadas y tipadas. Entre las
-  cuatro fuentes quedaron **238 filas en cuarentena** (224 de producción, 12 de fractura, 2 de
+- **18.234.202 filas** de producción mensual por pozo (2006-2026) cargadas y tipadas. Entre las
+  cuatro fuentes quedaron **239 filas en cuarentena** (225 de producción, 12 de fractura, 2 de
   reservas) y ningún recurso falló un check duro.
-- **`dim_pozo` con 611.304 tramos** SCD tipo 2 sobre 21 años de declaraciones, con tests de
+- **`dim_pozo` con 611.677 tramos** SCD tipo 2 sobre 21 años de declaraciones, con tests de
   unicidad y de no solapamiento de vigencias.
+- **Reproducible**: el proyecto de origen había medido 18.218.514 filas, 238 en cuarentena y
+  611.304 tramos el 2026-09-06. Seis días después, sobre otro bucket y otra base del catálogo,
+  las tablas que no dependen del portal (padrón, fractura, reservas, el mart) dieron exactamente
+  lo mismo, y producción creció solo por las declaraciones nuevas de 2026.
 - **El mart llega a 4.635 pozos** con completación y producción cruzadas.
 - **El acumulado de petróleo a 12 meses crece 7 veces** entre los pozos no convencionales de
   menos de 20 etapas de fractura y los de más de 40 (cuenca Neuquina).
@@ -126,14 +135,12 @@ reconstruir de cero— está en el runbook [`infra/terraform/README.md`](infra/t
 
 Lo que sigue son limitaciones reales del proyecto, no pendientes de redacción.
 
-- **Solo `dev` está aplicado, con producción acotada a 2024.** Los 29 recursos se aplicaron el
-  2026-09-11 y el 2026-09-12 corrieron las cuatro máquinas en verde: fractura (4.890 leídas,
-  4.878 publicadas, 12 en cuarentena, igual que el origen), producción solo 2024 (983.709
-  filas, 1 en cuarentena), el padrón (86.197, igual que el origen), reservas y gold con sus 81
-  tests. Con 2 workers la carga completa de producción no entra en el timeout del job: los
-  números de 21 años de arriba siguen siendo la medición del proyecto de origen (ADR 0006)
-  hasta que `prod` se aplique y cargue.
-- **prod no existe y el despliegue sigue siendo manual.** El state es local,
+- **Los dos ambientes están aplicados y cargados.** `dev` (2026-09-11) con producción acotada
+  a 2024 mediante el input de la máquina de estados; `prod` (2026-09-12) con los 21 años. Los
+  números de "Resultados" son de `prod`. En `dev`, con 2 workers, la carga completa de
+  producción no entra en el timeout de 60 minutos del job: es para probar cambios, no para
+  reproducir el dataset.
+- **El despliegue sigue siendo manual.** El state es local,
   `infra/terraform/bootstrap/` (backend S3, tabla de locks, roles de OIDC) nunca se aplicó y
   `deploy.yml` está deshabilitado a propósito (`if: vars.DEPLOY_ENABLED == 'true'`, variable que
   no existe) ([ADR 0005](docs/adr/0005-ambientes-dev-y-prod.md)).

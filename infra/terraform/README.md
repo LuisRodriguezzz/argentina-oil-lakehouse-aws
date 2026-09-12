@@ -188,12 +188,11 @@ y los tests de relación entre hechos y dimensiones lo delatan.
 Verificación, con `scripts/aws_logs.ps1` para los logs y con Athena para las filas:
 
 ```sql
--- Conteos medidos el 2026-09-06 con este mismo código en `ypf-data-platform`, el proyecto
--- del que deriva este repo (un despliegue único, con las bases sin sufijo). En dev, fractura
--- dio el mismo resultado el 2026-09-12; el resto sigue pendiente de la primera carga de prod.
--- Fractura y producción crecen con cada republicación del portal; reservas y el mart no,
--- porque el ZIP anual y el padrón de pozos ya están cerrados.
-SELECT count(*) FROM silver_prod.produccion_pozo;          -- 18.218.514
+-- Conteos medidos en prod el 2026-09-12 (el proyecto de origen había medido 18.218.514 filas
+-- de producción el 2026-09-06; el resto dio idéntico). Fractura y producción crecen con cada
+-- republicación del portal; reservas y el mart no, porque el ZIP anual y el padrón de pozos
+-- ya están cerrados.
+SELECT count(*) FROM silver_prod.produccion_pozo;          -- 18.234.202
 SELECT count(*) FROM silver_prod.pozo_primera_produccion;  --     86.197
 SELECT count(*) FROM silver_prod.fractura;                 --      4.878
 SELECT count(*) FROM silver_prod.reservas;                 --    198.734

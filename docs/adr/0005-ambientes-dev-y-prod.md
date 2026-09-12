@@ -1,6 +1,6 @@
 # ADR 0005 — Dos ambientes, dev y prod, en un solo repo
 
-**Estado:** aceptada · 2026-09-06 · dev aplicado el 2026-09-11; prod pendiente
+**Estado:** aceptada · 2026-09-06 · dev aplicado el 2026-09-11, prod el 2026-09-12
 
 ## Contexto
 
@@ -126,10 +126,12 @@ de aprobación que nadie mira. Cuando prod se rompa por algo que dev no vio, ent
 
 - Los dos ambientes conviven en la misma cuenta sin pisarse, y el costo en reposo sigue siendo
   cero: los schedules nacen deshabilitados en los dos (`enable_schedule = false`).
-- **Solo dev está aplicado** (29 recursos, 2026-09-11) y corrió el pipeline de fractura. prod
-  no existe todavía. El state sigue siendo local, `bootstrap/` nunca corrió y `deploy.yml`
-  está deshabilitado (`if: vars.DEPLOY_ENABLED == 'true'`, variable que no existe). El README
-  raíz lo dice en "Qué se verificó y qué no".
+- **Los dos ambientes están aplicados** (29 recursos cada uno; dev el 2026-09-11, prod el
+  2026-09-12) y cargados: dev con producción acotada a 2024, prod con los 21 años. Cada uno
+  tiene su propia base de Neon para el manifiesto (`oil_lakehouse_dev`, `oil_lakehouse_prod`,
+  en el mismo branch): compartirla haría que la ingesta de un ambiente diera por descargados
+  los archivos del otro. El state sigue siendo local, `bootstrap/` nunca corrió y `deploy.yml`
+  está deshabilitado (`if: vars.DEPLOY_ENABLED == 'true'`, variable que no existe).
 - El workflow no puede aplicar hasta que el state sea remoto: un runner de GitHub arranca vacío
   y con backend local creería que no existe nada. Aplicar `bootstrap/` es el primer paso de
   habilitarlo, no un extra.
