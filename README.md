@@ -126,16 +126,16 @@ reconstruir de cero— está en el runbook [`infra/terraform/README.md`](infra/t
 
 Lo que sigue son limitaciones reales del proyecto, no pendientes de redacción.
 
-- **En este repo todavía no se aplicó ningún ambiente.** Los números de arriba —filas, tiempos,
-  costos y los resultados analíticos— se midieron en el proyecto del que deriva (ADR 0006) con
-  este mismo código, sobre su despliegue único sin sufijo de ambiente. Son la referencia contra
-  la que comparar la primera corrida, no una medición de este repositorio.
-- **dev y prod están definidos en código pero no aplicados.** La variable `environment` sufija
-  los 29 recursos, hay un tfvars por ambiente y un workspace de Terraform por state
-  ([ADR 0005](docs/adr/0005-ambientes-dev-y-prod.md)). El state sigue siendo local,
+- **Solo `dev` está aplicado, y solo corrió fractura.** Los 29 recursos de dev se aplicaron el
+  2026-09-11 y `fractura_diaria` corrió en verde el 2026-09-12 con el mismo resultado que el
+  proyecto de origen: 4.890 filas leídas, 4.878 publicadas, 12 en cuarentena. El resto de los
+  números de arriba —producción, reservas, gold, tiempos y costos— sigue siendo la medición del
+  proyecto del que deriva (ADR 0006), con este mismo código y sin sufijo de ambiente, hasta que
+  `prod` se aplique y cargue.
+- **prod no existe y el despliegue sigue siendo manual.** El state es local,
   `infra/terraform/bootstrap/` (backend S3, tabla de locks, roles de OIDC) nunca se aplicó y
   `deploy.yml` está deshabilitado a propósito (`if: vars.DEPLOY_ENABLED == 'true'`, variable que
-  no existe). Es infraestructura escrita y validada, no infraestructura corriendo.
+  no existe) ([ADR 0005](docs/adr/0005-ambientes-dev-y-prod.md)).
 - **Los jobs de Glue no corren en paralelo.** Se comparten y admiten una corrida a la vez; el
   pipeline que llega segundo espera y reintenta en vez de fallar
   ([ADR 0001](docs/adr/0001-lakehouse-serverless-en-aws.md)).

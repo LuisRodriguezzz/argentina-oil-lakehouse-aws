@@ -58,8 +58,8 @@ Están escritos y validados; ninguno corrió contra AWS.
 
 - Los números que cita el README —filas por tabla, cuarentena, costos, tiempos— se midieron en
   el proyecto de origen con este mismo código, en su despliegue único sin sufijo de ambiente.
-  Acá todavía no se aplicó ningún ambiente, así que son la referencia contra la que comparar la
-  primera corrida, no una medición de este repo. El README lo dice en "Qué se verificó y qué no".
+  En dev ya se reprodujo fractura con el mismo resultado; el resto se confirma con la primera
+  carga de prod. El README lo dice en "Qué se verificó y qué no".
 - El repositorio de origen queda como está y no se toca: es de solo lectura. Quien quiera ver el
   destino local, el streaming o el modelo de ML, los encuentra ahí.
 - El nombre del proyecto cambió: el dominio son los datos públicos del upstream argentino, no

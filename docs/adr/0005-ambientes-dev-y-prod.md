@@ -1,6 +1,6 @@
 # ADR 0005 — Dos ambientes, dev y prod, en un solo repo
 
-**Estado:** aceptada · 2026-09-06 · **todavía no aplicada contra AWS**
+**Estado:** aceptada · 2026-09-06 · dev aplicado el 2026-09-11; prod pendiente
 
 ## Contexto
 
@@ -126,11 +126,10 @@ de aprobación que nadie mira. Cuando prod se rompa por algo que dev no vio, ent
 
 - Los dos ambientes conviven en la misma cuenta sin pisarse, y el costo en reposo sigue siendo
   cero: los schedules nacen deshabilitados en los dos (`enable_schedule = false`).
-- **Nada de esto está aplicado en este repo: no hay ningún ambiente desplegado.** Son 29
-  recursos por ambiente escritos y validados (`terraform validate`, `terraform fmt`), no
-  infraestructura corriendo. El state sigue siendo local, `bootstrap/` nunca corrió y
-  `deploy.yml` está deshabilitado (`if: vars.DEPLOY_ENABLED == 'true'`, variable que no existe).
-  El README raíz lo dice en "Qué se verificó y qué no".
+- **Solo dev está aplicado** (29 recursos, 2026-09-11) y corrió el pipeline de fractura. prod
+  no existe todavía. El state sigue siendo local, `bootstrap/` nunca corrió y `deploy.yml`
+  está deshabilitado (`if: vars.DEPLOY_ENABLED == 'true'`, variable que no existe). El README
+  raíz lo dice en "Qué se verificó y qué no".
 - El workflow no puede aplicar hasta que el state sea remoto: un runner de GitHub arranca vacío
   y con backend local creería que no existe nada. Aplicar `bootstrap/` es el primer paso de
   habilitarlo, no un extra.

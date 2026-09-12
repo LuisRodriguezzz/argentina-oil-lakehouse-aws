@@ -189,8 +189,8 @@ Verificación, con `scripts/aws_logs.ps1` para los logs y con Athena para las fi
 
 ```sql
 -- Conteos medidos el 2026-09-06 con este mismo código en `ypf-data-platform`, el proyecto
--- del que deriva este repo (un despliegue único, con las bases sin sufijo). Acá todavía no
--- se aplicó ningún ambiente: son la referencia contra la que comparar la primera corrida.
+-- del que deriva este repo (un despliegue único, con las bases sin sufijo). En dev, fractura
+-- dio el mismo resultado el 2026-09-12; el resto sigue pendiente de la primera carga de prod.
 -- Fractura y producción crecen con cada republicación del portal; reservas y el mart no,
 -- porque el ZIP anual y el padrón de pozos ya están cerrados.
 SELECT count(*) FROM silver_prod.produccion_pozo;          -- 18.218.514
