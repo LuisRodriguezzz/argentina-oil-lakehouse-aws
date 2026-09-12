@@ -48,13 +48,13 @@ Después, en este orden:
 
 ## Trust policy: quién puede asumir cada rol
 
-- **dev** confía en `repo:<owner>/<repo>:environment:dev`, en
-  `repo:<owner>/<repo>:ref:refs/heads/main` y en `repo:<owner>/<repo>:pull_request`. El
+- **dev** confía en `repo:<owner>@<id>/<repo>@<id>:environment:dev`, en
+  `repo:<owner>@<id>/<repo>@<id>:ref:refs/heads/main` y en `repo:<owner>@<id>/<repo>@<id>:pull_request`. El
   primero es el que usa el job `deploy-dev`, que declara `environment: dev`; el de la rama
   queda para un job de push sin environment y el de `pull_request` hace falta porque el
   `terraform plan` de cada PR necesita leer la cuenta. Un fork no puede: los tokens de un PR
   desde un fork no llevan el `sub` del repo original.
-- **prod** confía solo en `repo:<owner>/<repo>:environment:prod`. Ese claim aparece
+- **prod** confía solo en `repo:<owner>@<id>/<repo>@<id>:environment:prod`. Ese claim aparece
   únicamente cuando el job declara `environment: prod`, y ese environment tiene aprobación
   manual y está restringido a `main`. Es más ajustado que mirar la rama: ata el rol a la
   puerta que hay que abrir a mano.
