@@ -2,6 +2,8 @@
 -- Es el lado "diseño" del que fact_produccion_mensual cuenta el resultado; se cruzan por
 -- `idpozo` o, mejor, por `pozo_key`.
 
+with fractura as (
+
 select
     f.id_base_fractura_adjiv,
     f.idpozo,
@@ -48,3 +50,13 @@ left join {{ ref('dim_pozo') }} d
     on f.idpozo = d.idpozo
     and f.fecha_inicio_fractura >= d.vigente_desde
     and (d.vigente_hasta is null or f.fecha_inicio_fractura <= d.vigente_hasta)
+
+)
+
+select
+    fractura.*,
+    -- Intensidad de arena: toneladas por etapa. Es el número con el que se comparan diseños de
+    -- completación entre pozos. nullif por si alguna vez llega un 0 en etapas (el contrato
+    -- pide mínimo 1, pero una división por cero no puede depender de eso).
+    arena_bombeada_total_tn / nullif(cantidad_fracturas, 0) as arena_por_etapa_tn
+from fractura
