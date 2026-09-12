@@ -1,6 +1,8 @@
 # ADR 0005 — Dos ambientes, dev y prod, en un solo repo
 
-**Estado:** aceptada · 2026-09-06 · dev aplicado el 2026-09-11, prod el 2026-09-12
+**Estado:** aceptada · 2026-09-06
+
+**Actualizada:** 2026-09-12 — dev y prod aplicados, state en S3 y `deploy.yml` habilitado.
 
 ## Contexto
 
@@ -61,10 +63,10 @@ lugar donde equivocarse por cada archivo, y contratos que dejarían de ser legib
 
 ### Aislamiento del state: workspaces, no carpetas
 
-Un solo directorio y un workspace por ambiente: `terraform workspace select dev`. Con backend
-local queda `terraform.tfstate.d/dev/` y `terraform.tfstate.d/prod/`; con el backend S3 del día
-que se aplique `bootstrap/`, queda `env:/dev/...` y `env:/prod/...` del mismo bucket, sin tocar
-el bloque de backend.
+Un solo directorio y un workspace por ambiente: `terraform workspace select dev`. Con el
+backend S3 de `bootstrap/`, cada ambiente queda en `env:/dev/...` y `env:/prod/...` del mismo
+bucket, con un solo bloque de backend. Con backend local hubiera sido `terraform.tfstate.d/dev/`
+y `terraform.tfstate.d/prod/`: el cambio de backend no tocó nada más.
 
 Carpetas por ambiente (`envs/dev/`, `envs/prod/`, cada una con su backend) es la alternativa que
 más se ve, y tiene una ventaja real: el ambiente es visible en el path y es imposible aplicar el
@@ -84,12 +86,16 @@ código y no en un runbook: `aws_s3_bucket.lakehouse` tiene una `precondition` q
 secretos del repo: nada que rotar y nada que se filtre. El proveedor OIDC y los dos roles están
 definidos en `infra/terraform/bootstrap/oidc.tf`.
 
-La trust policy de **dev** acepta `repo:<owner>/<repo>:ref:refs/heads/main` y
-`repo:<owner>/<repo>:pull_request` (el segundo, porque el `plan` de cada PR necesita leer la
-cuenta). La de **prod** acepta un solo claim: `repo:<owner>/<repo>:environment:prod`, que GitHub
-emite únicamente cuando el job declara `environment: prod`. Como ese environment está
-configurado con aprobación manual y con "deployment branches: main only", el rol de prod queda
-atado a la puerta que hay que abrir a mano, que es más ajustado que mirar la rama.
+La trust policy de **dev** acepta el claim del environment `dev`, el de la rama `main` y el de
+`pull_request` (este último, porque el `plan` de cada PR necesita leer la cuenta). La de
+**prod** acepta uno solo: el del environment `prod`, que GitHub emite únicamente cuando el job
+declara `environment: prod`. Como ese environment está configurado con aprobación manual y con
+"deployment branches: main only", el rol de prod queda atado a la puerta que hay que abrir a
+mano, que es más ajustado que mirar la rama.
+
+El `sub` que emite GitHub lleva los ids numéricos del dueño y del repo además de sus nombres
+(`repo:<owner>@<id>/<repo>@<id>:...`), y así están escritos los sujetos en `bootstrap/`: los
+ids no cambian aunque el repo o la cuenta se renombren.
 
 ### Aprobación manual en prod, mismo artefacto en los dos
 
@@ -98,9 +104,10 @@ Un push a `main` aplica dev solo y sube el wheel; el job de prod depende de él,
 construir**: se baja el artefacto que produjo el job de dev, así lo que corre en prod es
 literalmente el mismo archivo que ya corrió en dev.
 
-El gate de "solo se despliega lo que pasó CI" es la protección de rama: a `main` se llega por
-pull request con el workflow `ci` como check obligatorio (ADR 0004). Repetir los tests en
-`deploy.yml` sería correrlos dos veces por el mismo commit.
+`deploy.yml` no repite los tests: el workflow `ci` ya corrió sobre el mismo commit en el pull
+request (ADR 0004), y correrlos dos veces no agrega información. Lo que falta para que eso sea
+un gate de verdad es protección de rama en `main`, que hoy no está: el repo lo toca una sola
+persona y nada impide un push directo. Está anotado como límite en el README.
 
 ### Neon y SSM: un branch y un parámetro por ambiente
 
@@ -130,12 +137,12 @@ de aprobación que nadie mira. Cuando prod se rompa por algo que dev no vio, ent
   2026-09-12) y cargados: dev con producción acotada a 2024, prod con los 21 años. Cada uno
   tiene su propia base de Neon para el manifiesto (`oil_lakehouse_dev`, `oil_lakehouse_prod`,
   en el mismo branch): compartirla haría que la ingesta de un ambiente diera por descargados
-  los archivos del otro. Desde el 2026-09-12 el state es remoto (`bootstrap/` aplicado) y
-  `deploy.yml` está habilitado: dev se despliega solo en cada merge a `main` y prod espera
-  una aprobación manual en el GitHub Environment.
-- El workflow no puede aplicar hasta que el state sea remoto: un runner de GitHub arranca vacío
-  y con backend local creería que no existe nada. Aplicar `bootstrap/` es el primer paso de
-  habilitarlo, no un extra.
+  los archivos del otro.
+- **El despliegue es automático desde el 2026-09-12.** El state es remoto (`bootstrap/`
+  aplicado), `deploy.yml` corre con `DEPLOY_ENABLED = true`, dev se despliega en cada merge a
+  `main` y prod espera una aprobación manual en el GitHub Environment. Aplicar `bootstrap/` era
+  condición previa: un runner de GitHub arranca vacío y con backend local creería que no existe
+  nada.
 - Aparece una variable de entorno más en el contrato entre Terraform y el código
   (`GLUE_DATABASE_SUFFIX`). Si Terraform deja de pasarla, los jobs escriben en `bronze` a secas
   en vez de fallar: es un default silencioso, y el precio de que los contratos no nombren el

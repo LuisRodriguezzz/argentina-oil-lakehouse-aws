@@ -3,16 +3,13 @@
 ![CI](https://github.com/LuisRodriguezzz/argentina-oil-lakehouse-aws/actions/workflows/ci.yml/badge.svg)
 
 Lakehouse serverless sobre los datos públicos del upstream argentino (Secretaría de Energía,
-2006-2026). Cubre el camino completo: ingesta idempotente a S3, capas bronze y silver en
-Iceberg con contratos de calidad y cuarentena, y un modelo dimensional en dbt sobre Athena,
-todo orquestado con Step Functions y desplegado con Terraform en dos ambientes. Corre entero en
-AWS y, cuando nadie lo dispara, cuesta cero. Es un proyecto de portfolio: está pensado para que
-alguien que evalúa perfiles de ingeniería de datos pueda leer las decisiones, correrlo y
-verificar los números.
+2006-2026): ingesta a S3, bronze y silver en Iceberg con contratos de calidad, y un modelo
+dimensional con dbt sobre Athena. Corre entero en AWS y en reposo cuesta cero.
 
-Deriva de [`ypf-data-platform`](https://github.com/LuisRodriguezzz/ypf-data-platform), donde el
-mismo pipeline corría además en una máquina local; acá el único destino es AWS y el porqué —con
-lo que se dejó afuera— está en el [ADR 0006](docs/adr/0006-origen-y-alcance.md).
+Es un proyecto de portfolio de ingeniería de datos. Deriva de
+[`ypf-data-platform`](https://github.com/LuisRodriguezzz/ypf-data-platform), que además corría
+sobre una máquina local; acá el único destino es AWS
+([ADR 0006](docs/adr/0006-origen-y-alcance.md)).
 
 ## Arquitectura
 
@@ -32,11 +29,25 @@ flowchart LR
   L -.- N["Neon<br/>manifiesto de ingesta"]
 ```
 
-Cinco jobs de Glue y una máquina de estados por pipeline. La ingesta es un Python shell de 1/16
-de DPU (es I/O de red, no necesita Spark); bronze y silver son Glue 5.0 con Spark e Iceberg;
-gold es un job de Glue que corre `dbt build` y deja que el SQL lo ejecute Athena. El catálogo es
-el Glue Data Catalog y el manifiesto de ingesta, un Postgres serverless en Neon. Nada queda
-prendido entre corridas (ADR 0001).
+Cinco jobs de Glue y cuatro máquinas de estados. La ingesta es un Python shell de 1/16 de DPU:
+es I/O de red y no necesita Spark. Bronze y silver son Glue 5.0 con Spark e Iceberg. Gold es un
+job de Glue que corre `dbt build` y deja que el SQL lo ejecute Athena. El catálogo es el Glue
+Data Catalog y el manifiesto de ingesta, un Postgres serverless en Neon. Nada queda prendido
+entre corridas ([ADR 0001](docs/adr/0001-lakehouse-serverless-en-aws.md)).
+
+## Qué demuestra cada módulo
+
+| Módulo | En una línea |
+| --- | --- |
+| [`pipelines/ingest/`](pipelines/ingest/README.md) | Idempotencia en dos niveles (tamaño y fecha de origen, después sha256) con manifiesto en Postgres, y subida multipart sin buffer en RAM. |
+| `pipelines/spark_jobs/bronze_load.py` | Carga cruda con linaje por fila y reemplazo de la partición del recurso. |
+| [`pipelines/contracts/`](pipelines/contracts/README.md) | Contratos de datos en YAML: tipos, rangos, checks duros y cuarentena auditable. |
+| `pipelines/reservas/` | Un Excel de doble entrada, con 7 filas de encabezado y rangos fusionados, parseado por vocabulario. |
+| `pipelines/dbt/` | Modelo dimensional con SCD tipo 2 sobre 21 años: 8 modelos, 82 tests y documentación por columna. |
+| `pipelines/aws/` | Wrappers de Glue: traducen los argumentos del job a variables de entorno y resuelven el secreto por SSM. |
+| [`infra/terraform/`](infra/terraform/README.md) | 29 recursos por ambiente, dev y prod con workspaces; `terraform destroy` deja costo cero. |
+| [`infra/terraform/bootstrap/`](infra/terraform/bootstrap/README.md) | State remoto en S3 con bloqueo en DynamoDB, y los dos roles de OIDC del despliegue. |
+| `.github/workflows/` | CI que no toca AWS (lint, 140 tests, `dbt parse`, Terraform) y CD por ambiente con OIDC. |
 
 ## Fuentes
 
@@ -47,57 +58,54 @@ prendido entre corridas (ADR 0001).
 | Datos de fractura (Adjunto IV) | `silver.fractura` | 4.878 | diaria | [fractura.md](docs/fuentes/fractura.md) |
 | Reservas y recursos al 31/12 | `silver.reservas` | 198.734 | anual (2020-2024) | [reservas.md](docs/fuentes/reservas.md) |
 
-Las dos primeras salen del mismo dataset de CKAN; reservas es un ZIP suelto por URL fuera del
-portal, con un Excel de doble entrada que hay que desarmar.
+Las dos primeras salen del mismo dataset de CKAN. Reservas es un ZIP suelto por URL, fuera del
+portal, con un Excel de doble entrada que hay que desarmar. No hay datos simulados: cada tabla
+declara una columna `data_origin`, `real` en lo que entra del portal y `derived` en gold.
 
-## Trazabilidad: qué es real y qué es derivado
+## Cómo se opera hoy
 
-Cada tabla del lakehouse declara una columna `data_origin`. No hay datos simulados ni
-inventados: todo lo que entra viene del portal público, y lo único que no es una medición son
-las tablas calculadas sobre ella.
+El despliegue es automático desde el 2026-09-12. Los pipelines se disparan a mano.
 
-| Tabla | `data_origin` | Qué es |
-| --- | --- | --- |
-| `bronze/silver.produccion_pozo`, `bronze/silver.pozo_primera_produccion` | `real` | DDJJ y padrón publicados por la Secretaría de Energía |
-| `bronze.pozo_catalogo`, `bronze.produccion_pozo_no_convencional` | `real` | Agregados que publica el mismo portal; se cargan pero todavía no tienen contrato |
-| `bronze/silver.fractura` | `real` | Declaraciones del Adjunto IV, dato preliminar sujeto a revisión |
-| `bronze/silver.reservas` | `real` | Planillas anuales de reservas y recursos por yacimiento |
-| `gold.dim_*`, `gold.fact_*`, `gold.mart_*` | `derived` | Modelo dimensional calculado sobre silver |
+```mermaid
+flowchart LR
+  R["rama"] --> PR["pull request<br/>ci + plan de dev"]
+  PR --> M["merge a main"]
+  M --> D["apply de dev<br/>automático"]
+  D --> AP["aprobación manual<br/>GitHub Environment prod"]
+  AP --> P["apply de prod<br/>mismo wheel que dev"]
+```
 
-## Qué demuestra cada módulo
+- El state de Terraform vive en S3 con bloqueo en DynamoDB, un archivo por workspace.
+- GitHub Actions se autentica con OIDC. No hay claves de AWS en los secretos del repo.
+- Cada `apply` sube el wheel del proyecto y los wrappers de los jobs a `artifacts/` del bucket.
+  Prod no vuelve a construir el wheel: baja el artefacto que ya corrió en dev.
+- El porqué está en el [ADR 0005](docs/adr/0005-ambientes-dev-y-prod.md).
 
-| Módulo | En una línea |
-| --- | --- |
-| `pipelines/ingest/` | **Idempotencia** en dos niveles (tamaño/fecha de origen y sha256) con manifiesto en Postgres, subiendo con multipart sin buffer en RAM ni archivo temporal, que es lo que permite entrar en 1/16 de DPU |
-| `pipelines/spark_jobs/bronze_load.py` | Carga cruda con **linaje** por fila y reemplazo de partición por recurso |
-| `pipelines/contracts/` + `silver_load.py` | **Contratos de datos** declarativos: tipos, rangos, checks duros y cuarentena auditable |
-| `pipelines/reservas/` | El caso raro: un **Excel de doble entrada** con 7 filas de encabezado y rangos fusionados, parseado por vocabulario y escrito con pyiceberg |
-| `pipelines/dbt/` | Modelo dimensional con **SCD tipo 2** sobre 21 años, 81 tests y documentación por columna |
-| `pipelines/aws/` | Los **wrappers de Glue**: traducen argumentos del job a variables de entorno y resuelven el secreto por SSM, nunca en claro |
-| `infra/terraform/` | **IaC** completa: 29 recursos por ambiente, `terraform destroy` deja costo cero |
-| `.github/workflows/ci.yml` | **CI** en tres jobs: lint y tests (más el nombre del wheel que espera Terraform), `terraform fmt`/`validate` y `dbt parse` sin conexión. No toca AWS |
-| `.github/workflows/deploy.yml` | **CD por ambiente**: plan en el PR, apply de dev en `main`, prod con aprobación manual y OIDC, sin claves en el repo |
-
-## Correrlo en AWS
-
-Requisitos: una cuenta de AWS, Terraform, [uv](https://docs.astral.sh/uv/), un proyecto en
-[Neon](https://neon.tech) (plan gratuito) y la AWS CLI configurada.
+Disparar un pipeline es un comando. Los cuatro son `produccion_pozo_mensual`,
+`fractura_diaria`, `reservas_mensual` y `gold_mensual`.
 
 ```powershell
 cd infra\terraform
-terraform init
-terraform workspace select -or-create dev     # un workspace por ambiente (ADR 0005)
-terraform apply -var-file=envs\dev.tfvars     # 29 recursos: S3, Glue, Step Functions, Athena, IAM
-..\..\scripts\aws_deploy.ps1                  # wheel del proyecto + wrappers de los jobs a S3
-aws stepfunctions start-execution --state-machine-arn <arn> --input '{}'
+terraform workspace select prod
+$arn = (terraform output -json state_machine_arns | ConvertFrom-Json).fractura_diaria
+aws stepfunctions start-execution --state-machine-arn $arn --input '{}'
+..\..\scripts\aws_logs.ps1 -Ambiente prod    # resumen de la última corrida de cada job
 ```
 
-Falta un paso previo por ambiente: el parámetro SecureString
-`/oil-lakehouse/<ambiente>/postgres_dsn` con la cadena de conexión al branch de Neon. El
-procedimiento completo —desplegar, correr cada pipeline, consultar en Athena, destruir y
-reconstruir de cero— está en el runbook [`infra/terraform/README.md`](infra/terraform/README.md).
+## Resultados medidos
 
-**Tiempos medidos** en `prod` el 2026-09-12, cargando los 21 años desde cero:
+Medido en `prod` el 2026-09-12, cargando los 21 años desde cero.
+
+| Qué | Valor |
+| --- | ---: |
+| Filas de producción mensual por pozo (2006-2026) | 18.234.202 |
+| Filas en cuarentena entre las cuatro fuentes (225 producción, 12 fractura, 2 reservas) | 239 |
+| Recursos que fallaron un check duro | 0 |
+| Tramos de vigencia en `dim_pozo` (SCD tipo 2) | 611.677 |
+| Pozos en el mart, con completación y producción cruzadas | 4.635 |
+| Tests de dbt en verde, dentro del job de gold | 82 |
+| Tests de Python en verde, en el CI | 140 |
+| Costo de la reconstrucción completa | < 2 USD |
 
 | Paso | Job | Duración |
 | --- | --- | --- |
@@ -105,87 +113,57 @@ reconstruir de cero— está en el runbook [`infra/terraform/README.md`](infra/t
 | Bronze de producción | Spark, 4 workers | 7 min |
 | Silver de producción + padrón | Spark, 4 workers | 19 + 2 min |
 | Fractura y reservas, máquinas completas | | 6 y 5 min |
-| Gold (8 modelos, 81 tests sobre Athena) | Glue 5.0, 2 workers | 4 min |
+| Gold (8 modelos, 82 tests sobre Athena) | Glue 5.0, 2 workers | 4 min |
 
-Casi todo el tiempo es la descarga del portal. El costo de esa reconstrucción completa fue de
-**menos de 2 USD** (el mismo orden que midió el proyecto de origen), con gold en unos 0,15 USD.
-- **En reposo, cero**: no hay NAT Gateway, ni RDS, ni EMR, ni un entorno de orquestación
-  administrado, y los schedules de EventBridge nacen deshabilitados.
+Casi todo el tiempo es la descarga del portal. Gold cuesta unos 0,15 USD por corrida.
 
-## Resultados
+Dos hallazgos sobre el dato, no sobre la infraestructura:
 
-- **18.234.202 filas** de producción mensual por pozo (2006-2026) cargadas y tipadas. Entre las
-  cuatro fuentes quedaron **239 filas en cuarentena** (225 de producción, 12 de fractura, 2 de
-  reservas) y ningún recurso falló un check duro.
-- **`dim_pozo` con 611.677 tramos** SCD tipo 2 sobre 21 años de declaraciones, con tests de
-  unicidad y de no solapamiento de vigencias.
-- **Reproducible**: el proyecto de origen había medido 18.218.514 filas, 238 en cuarentena y
-  611.304 tramos el 2026-09-06. Seis días después, sobre otro bucket y otra base del catálogo,
-  las tablas que no dependen del portal (padrón, fractura, reservas, el mart) dieron exactamente
-  lo mismo, y producción creció solo por las declaraciones nuevas de 2026.
-- **El mart llega a 4.635 pozos** con completación y producción cruzadas.
-- **El acumulado de petróleo a 12 meses crece 7 veces** entre los pozos no convencionales de
-  menos de 20 etapas de fractura y los de más de 40 (cuenca Neuquina).
-- **CI en verde**: 138 tests de Python, `ruff check`, `ruff format --check`, `dbt parse`,
-  `terraform fmt` y `terraform validate`.
-- **81 tests de dbt en verde**, que corren dentro del job de gold y no en el CI: construir gold
-  necesita la cuenta de AWS.
+- El acumulado de petróleo a 12 meses crece 7 veces entre los pozos no convencionales de menos
+  de 20 etapas de fractura y los de más de 40, en la cuenca Neuquina.
+- La ingesta usa la familia "DDJJ abiertas y cerradas" y no la normal. Comparado un año
+  completo: 0 diferencias en producción, inyección y estado, +159 declaraciones rectificadas, y
+  es la única que la Secretaría sigue actualizando
+  ([comparación](docs/fuentes/comparacion-familias-produccion.md)).
 
-## Qué se verificó y qué no
+## Qué no hace
 
-Lo que sigue son limitaciones reales del proyecto, no pendientes de redacción.
+Son límites del proyecto, no pendientes de redacción.
 
-- **Los dos ambientes están aplicados y cargados.** `dev` (2026-09-11) con producción acotada
-  a 2024 mediante el input de la máquina de estados; `prod` (2026-09-12) con los 21 años. Los
-  números de "Resultados" son de `prod`. En `dev`, con 2 workers, la carga completa de
-  producción no entra en el timeout de 60 minutos del job: es para probar cambios, no para
-  reproducir el dataset.
-- **El despliegue es automático desde el 2026-09-12, y todavía no acumuló historia.** El
-  state vive en S3, `infra/terraform/bootstrap/` está aplicado y `deploy.yml` corre en cada
-  merge a `main`: dev solo, prod con aprobación manual y OIDC, sin claves en el repo
-  ([ADR 0005](docs/adr/0005-ambientes-dev-y-prod.md)). Lo que no hace es disparar los
-  pipelines: eso sigue siendo a mano o por los schedules, que están apagados.
-- **Los jobs de Glue no corren en paralelo.** Se comparten y admiten una corrida a la vez; el
-  pipeline que llega segundo espera y reintenta en vez de fallar
+- **No hay streaming ni ML.** El proyecto de origen los tenía. Un stream factura mientras
+  existe y MLflow no tiene opción gratuita en AWS
+  ([ADR 0006](docs/adr/0006-origen-y-alcance.md)).
+- **No hay monitoreo ni alertas.** Una ejecución fallida queda en el historial de Step Functions
+  y en los logs del job. Nada avisa.
+- **Los pipelines no corren solos.** Los schedules de EventBridge existen pero nacen
+  deshabilitados en los dos ambientes. El despliegue automático tampoco los dispara.
+- **`main` no tiene protección de rama.** El repo lo toca una sola persona. El CI corre en cada
+  pull request, pero nada impide un push directo.
+- **Los jobs de Glue no corren en paralelo.** Admiten una corrida a la vez y se comparten entre
+  pipelines; el que llega segundo espera y reintenta
   ([ADR 0001](docs/adr/0001-lakehouse-serverless-en-aws.md)).
-- **No hay alertas.** Una ejecución fallida queda en el historial de Step Functions y en los
-  logs del job; no hay nada que avise. Un webhook en un repo público sería un secreto en el repo.
+- **El CI no levanta nada en AWS.** Que los jobs corran contra Iceberg y Athena se verifica
+  disparando la máquina de estados ([ADR 0004](docs/adr/0004-ci-en-github-actions.md)).
 - **`dbt docs` no se genera** ([ADR 0003](docs/adr/0003-gold-con-dbt-sobre-athena.md)).
-- **No hay streaming ni ML.** El proyecto de origen los tenía y acá se dejaron afuera a
-  propósito: un stream factura mientras existe y rompe el costo cero en reposo, y MLflow no
-  tiene opción gratuita en AWS ([ADR 0006](docs/adr/0006-origen-y-alcance.md)).
-- **El CI no levanta nada en AWS.** Valida lint, tests unitarios, `dbt parse` y Terraform; que
-  los jobs corran de verdad contra Iceberg y Athena se verifica disparando la máquina de estados
-  a mano
-  ([ADR 0004](docs/adr/0004-ci-en-github-actions.md)).
-- **La ingesta de producción usa la familia "DDJJ abiertas y cerradas"**, comparada un año
-  completo (2024) contra la familia normal: 0 diferencias en las columnas de producción,
-  inyección y estado de las declaraciones que comparten (solo corrige metadata de catálogo en
-  unos pocos pozos), +159 declaraciones rectificadas que la normal no tiene, y es la única que
-  la Secretaría sigue actualizando — la normal quedó congelada 5 meses antes según CKAN. Detalle
-  en
-  [`docs/fuentes/comparacion-familias-produccion.md`](docs/fuentes/comparacion-familias-produccion.md).
+- **dev no reproduce el dataset.** Con 2 workers la carga completa de producción no entra en el
+  timeout de 60 minutos del job, así que dev corre con producción acotada a 2024.
 
 ## Documentación
 
-- **Decisiones de arquitectura** — [`docs/adr/`](docs/adr/): lakehouse serverless en Glue, Step
-  Functions y Athena (0001), contratos en YAML (0002), gold con dbt sobre Athena (0003), CI
-  (0004), ambientes dev y prod (0005), origen y alcance (0006).
+- **Decisiones** — [`docs/adr/`](docs/adr/): lakehouse serverless (0001), contratos en YAML
+  (0002), gold con dbt sobre Athena (0003), CI (0004), ambientes dev y prod (0005), origen y
+  alcance (0006).
 - **Fuentes** — [`docs/fuentes/`](docs/fuentes/): una ficha por fuente con lo medido sobre el
-  dato real (columnas, clave, rarezas y las decisiones del contrato que salen de ahí), más la
-  comparación de las dos familias de producción.
-  [`docs/semana-0-derisking.md`](docs/semana-0-derisking.md) tiene las pruebas contra las fuentes
-  reales previas a escribir infraestructura.
-- **Módulos** — READMEs propios en [`pipelines/ingest/`](pipelines/ingest/README.md),
-  [`pipelines/contracts/`](pipelines/contracts/README.md),
-  [`pipelines/spark_jobs/`](pipelines/spark_jobs/README.md) e
-  [`infra/terraform/`](infra/terraform/README.md), que es además el runbook de despliegue.
+  dato real. [`docs/semana-0-derisking.md`](docs/semana-0-derisking.md) tiene las pruebas
+  contra las fuentes reales previas a escribir infraestructura.
+- **Runbook** — [`infra/terraform/README.md`](infra/terraform/README.md): desplegar, correr un
+  pipeline, consultar, destruir y reconstruir de cero.
 
 ## Licencias y atribuciones
 
 - **Datos del upstream argentino**: Secretaría de Energía de la Nación Argentina, portal
-  [datos.energia.gob.ar](http://datos.energia.gob.ar). Datos públicos; producción y fractura son
-  declaraciones juradas de las operadoras y fractura se publica como dato preliminar sujeto a
+  [datos.energia.gob.ar](http://datos.energia.gob.ar). Datos públicos. Producción y fractura son
+  declaraciones juradas de las operadoras, y fractura se publica como dato preliminar sujeto a
   revisión.
 - **Este repositorio** no está afiliado a YPF S.A. ni a ninguna de las operadoras que aparecen
   en los datos. El nombre refiere al dominio del problema, no a una compañía.

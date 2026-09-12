@@ -2,6 +2,8 @@
 
 **Estado:** aceptada · 2026-09-11
 
+**Actualizada:** 2026-09-12 — el state de Terraform pasó de local a S3 (ADR 0005).
+
 ## Contexto
 
 El pipeline entero —ingesta, bronze, silver sobre Iceberg y gold— tiene que correr en AWS con
@@ -44,11 +46,15 @@ vive en SSM Parameter Store como SecureString y los jobs reciben el *nombre* del
 nunca el valor: un secreto en los argumentos de un job queda visible en la consola y en
 `get-job-runs`.
 
-**State de Terraform local.** El entorno es efímero: se crea, se demuestra y se destruye. Un
-backend remoto pediría un bucket y una tabla de locks que sobrevivirían al `destroy` y
-costarían plata para nada, y no hay un segundo operador con quien coordinar. `*.tfstate` está
-en el `.gitignore`. El backend S3 queda escrito y comentado en `infra/terraform/versions.tf`
-para el día que haga falta (ADR 0005).
+**State de Terraform: local mientras el operador sea uno.** El entorno es efímero: se crea, se
+demuestra y se destruye. Un backend remoto pide un bucket y una tabla de locks que sobreviven
+al `destroy`, y con una sola persona aplicando desde una máquina no hay con quién coordinar.
+`*.tfstate` está en el `.gitignore`.
+
+Esa condición se cayó el 2026-09-12, cuando el despliegue pasó a GitHub Actions: un runner
+arranca vacío y con state local creería que no existe nada. El state vive ahora en S3 con
+bloqueo en DynamoDB (`infra/terraform/bootstrap/`, ADR 0005), y cuesta unos KB en S3 más una
+tabla en `PAY_PER_REQUEST`.
 
 ## Consecuencias
 
@@ -64,7 +70,8 @@ para el día que haga falta (ADR 0005).
   espera a que se libere el job —hasta media hora— en vez de fallar al instante. Medido en
   dev el 2026-09-12: el segundo silver de producción cayó en ese error porque Glue todavía
   contaba el clúster del primero como activo; con 60 s de espera se resuelve en un intento.
-- Si se pierde el `terraform.tfstate` hay que reimportar o destruir a mano. Es el precio
-  aceptado por no sostener infraestructura para el propio Terraform.
+- El state de los ambientes está en S3 y versionado. El que sigue siendo local es el de
+  `bootstrap/`: son diez recursos que casi nunca cambian y, si se pierde el archivo, se
+  reimportan.
 - Perder la cuenta de Neon deja el manifiesto sin backend: los datos de landing siguen en S3
   pero bronze no sabe qué cargar. La reconstrucción es correr la ingesta de nuevo.

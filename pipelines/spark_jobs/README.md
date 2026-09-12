@@ -17,15 +17,10 @@ partición por recurso (`_resource_id`). Qué hace, en orden:
    columnas de linaje (`_resource_id`, `_source_key`, `_source_sha256`, `_ingest_date`,
    `_loaded_at`, `data_origin`) y reemplaza la partición del recurso.
 
-Wrapper: `pipelines/aws/bronze_job.py` (job `bronze_load<sufijo>`). Argumento propio
-`--dataset`; el resto (`--GLUE_WAREHOUSE`, `--GLUE_DATABASE_SUFFIX`, `--S3_LANDING_BUCKET`,
-`--S3_REGION`, `--POSTGRES_DSN_SSM_PARAMETER`) son los argumentos por defecto que pone
-Terraform. El DSN de Postgres llega por SSM, nunca en claro.
-
 ## silver_load
 
-Aplica un contrato de datos (`pipelines/contracts/*.yaml`, ADR 0002) sobre una tabla bronze
-y escribe `lake.silver.*` tipada y particionada. Qué hace, por recurso pendiente:
+Aplica un contrato de datos (`pipelines/contracts/*.yaml`, ADR 0002) sobre una tabla bronze y
+escribe `lake.silver.*` tipada y particionada. Qué hace, por recurso pendiente:
 
 1. Compara `_resource_id -> _source_sha256` entre bronze y silver: procesa solo lo nuevo o
    cambiado, igual que bronze.
@@ -38,24 +33,26 @@ y escribe `lake.silver.*` tipada y particionada. Qué hace, por recurso pendient
    duplicada, más de 1 % de rechazos): si alguno falla, no escribe y el job devuelve 1.
 6. Reemplaza las particiones afectadas y registra la corrida en `lake.silver.dq_runs`.
 
-Wrapper: `pipelines/aws/silver_job.py` (job `silver_load<sufijo>`). Argumento propio
-`--contract`; silver no toca landing ni el manifiesto, así que no recibe el DSN.
+## Cómo se invocan en AWS
 
-## Cómo se corren
-
-Las máquinas de estados de `infra/terraform/stepfunctions.tf` encadenan ingesta, bronze,
-silver y gold, y pasan `--dataset` y `--contract` en cada paso. A mano:
+Las máquinas de estados de `infra/terraform/stepfunctions.tf` encadenan ingesta, bronze, silver
+y gold, y pasan `--dataset` y `--contract` en cada paso. A mano:
 
 ```bash
 aws stepfunctions start-execution --state-machine-arn <arn> --input '{}'   # pipeline entero
 aws glue start-job-run --job-name silver_load_dev --arguments '{"--contract": "fractura"}'
 ```
 
-Los dos jobs de Spark aceptan además `--resource-id` en `--arguments` para reprocesar un solo
-recurso sin tocar el resto de la tabla.
-
-El input de la ejecución acota la corrida sin tocar la definición: con
+Los dos jobs aceptan además `--resource-id` para reprocesar un solo recurso sin tocar el resto
+de la tabla. El input de la ejecución acota la corrida sin tocar la definición: con
 `{"ingesta": {"--only": "^Padr"}}` la ingesta baja solo los recursos que matchean.
+
+Los wrappers son `pipelines/aws/bronze_job.py` (job `bronze_load<sufijo>`) y
+`pipelines/aws/silver_job.py` (job `silver_load<sufijo>`). Cada uno tiene un argumento propio
+(`--dataset` y `--contract`); el resto (`--GLUE_WAREHOUSE`, `--GLUE_DATABASE_SUFFIX`,
+`--S3_LANDING_BUCKET`, `--S3_REGION`, `--POSTGRES_DSN_SSM_PARAMETER`) son los argumentos por
+defecto que pone Terraform. El DSN de Postgres llega por SSM, nunca en claro, y solo a bronze:
+silver no toca landing ni el manifiesto.
 
 Para mirar el resultado, `uv run python scripts/check_lake.py --namespace silver --suffix _dev`
 muestra filas por partición, el último snapshot de cada tabla, `dq_runs` y la cuarentena
@@ -64,9 +61,8 @@ agrupada por motivo.
 ## Decisiones
 
 - **Bronze no tipa.** Todo entra como string y se conserva tal cual, filas basura incluidas:
-  si bronze tipa, un CSV mal formado se pierde antes de que alguien pueda auditarlo. El
-  casteo y las reglas de calidad son de silver, y ahí el YAML manda (ADR 0002): tipos,
-  unicidad y rangos salen del contrato, y los rechazos se guardan en vez de descartarse.
+  si bronze tipa, un CSV mal formado se pierde antes de que alguien pueda auditarlo. El casteo
+  y las reglas de calidad son de silver, y ahí el YAML manda (ADR 0002).
 - **Idempotencia por hash, no por fecha.** El manifiesto ya distingue contenido nuevo de
   contenido repetido; los dos jobs comparan el `sha256` cargado contra el del origen.
 - **Una partición por recurso.** `overwritePartitions()` reemplaza el año que se recarga sin
@@ -82,5 +78,5 @@ agrupada por motivo.
 - **BOM.** Los CSV del portal son UTF-8 con BOM y Spark no lo saca: el nombre de la primera
   columna se limpia a mano (`clean_column_name`).
 - **Las funciones puras viven en `bronze_rules.py` y `silver_rules.py`**: las expresiones de
-  casteo y de rechazo son strings de SQL, así que `tests/spark_jobs/` las compara de a una
-  sin levantar Spark. La integración se valida corriendo el job en Glue.
+  casteo y de rechazo son strings de SQL, así que `tests/spark_jobs/` las compara de a una sin
+  levantar Spark. La integración se valida corriendo el job en Glue.

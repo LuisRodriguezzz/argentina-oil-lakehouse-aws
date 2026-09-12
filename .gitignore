@@ -33,5 +33,3 @@ pipelines/dbt/.user.yml
 # artefacto de Windows por redirecciones
 NUL
 
-# instrucciones locales del asistente: no se publican
-CLAUDE.md
