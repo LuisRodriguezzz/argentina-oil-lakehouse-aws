@@ -60,8 +60,10 @@ para el día que haga falta (ADR 0005).
   de un job de Glue (ADR 0003).
 - Los jobs de Glue admiten una corrida a la vez y los pipelines de fuente comparten
   `ingest_landing` y `silver_load`, así que no van en paralelo. Cada paso reintenta
-  `Glue.ConcurrentRunsExceededException` cada 5 minutos hasta 10 veces: el que llega segundo
-  espera a que se libere el job —casi una hora— en vez de fallar al instante.
+  `Glue.ConcurrentRunsExceededException` cada minuto hasta 30 veces: el que llega segundo
+  espera a que se libere el job —hasta media hora— en vez de fallar al instante. Medido en
+  dev el 2026-09-12: el segundo silver de producción cayó en ese error porque Glue todavía
+  contaba el clúster del primero como activo; con 60 s de espera se resuelve en un intento.
 - Si se pierde el `terraform.tfstate` hay que reimportar o destruir a mano. Es el precio
   aceptado por no sostener infraestructura para el propio Terraform.
 - Perder la cuenta de Neon deja el manifiesto sin backend: los datos de landing siguen en S3

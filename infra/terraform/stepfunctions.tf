@@ -43,14 +43,15 @@ locals {
     }
   }
 
-  # Los jobs de Glue corren de a uno y se comparten entre pipelines: si dos máquinas se
-  # cruzan, la segunda falla al instante con ConcurrentRunsExceededException en vez de hacer
-  # cola. Reintentar cada 5 minutos sin backoff da casi una hora de espera, que alcanza para
-  # que termine la corrida que estaba ocupando el job.
+  # Los jobs de Glue corren de a uno y se comparten: si dos máquinas se cruzan, o si dos
+  # pasos seguidos usan el mismo job (los dos silver de producción), el segundo falla al
+  # instante con ConcurrentRunsExceededException en vez de hacer cola. Un minuto entre
+  # intentos porque el caso común es el clúster del paso anterior liberándose, que tarda
+  # segundos; treinta intentos dan media hora para el caso raro de otra máquina en curso.
   reintentar_si_el_job_esta_ocupado = [{
     ErrorEquals     = ["Glue.ConcurrentRunsExceededException"]
-    IntervalSeconds = 300
-    MaxAttempts     = 10
+    IntervalSeconds = 60
+    MaxAttempts     = 30
     BackoffRate     = 1
   }]
 
