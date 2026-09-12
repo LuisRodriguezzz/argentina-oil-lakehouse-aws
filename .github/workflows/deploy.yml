@@ -5,16 +5,12 @@
 # cuenta de AWS y tiene que seguir siendo rápido. Esto habla con AWS, se dispara solo desde
 # `main` y en prod espera una aprobación humana.
 #
-# ESTE WORKFLOW ESTÁ DESHABILITADO. Todos los jobs empiezan con
-# `if: vars.DEPLOY_ENABLED == 'true'` y esa variable no existe en el repo, así que el
-# workflow corre, saltea los tres jobs y termina en verde sin tocar nada. Está así porque el
-# state de Terraform todavía es local (`infra/terraform/versions.tf`): un runner de GitHub
-# arranca vacío, no ve ese archivo y un `apply` desde acá creería que no existe nada y
-# volvería a crear los 29 recursos. Cómo habilitarlo, en `infra/terraform/bootstrap/README.md`.
+# Habilitado desde el 2026-09-12 con la variable de repo `DEPLOY_ENABLED = true`; todos los
+# jobs la chequean, así que ponerla en cualquier otro valor apaga el despliegue sin tocar
+# este archivo. Necesita el state remoto y los roles de OIDC de `infra/terraform/bootstrap/`.
 #
-# El gate de "solo se despliega lo que pasó CI" es la protección de la rama `main`: a `main`
-# se llega por pull request con el workflow `ci` en verde como check obligatorio. Repetir los
-# tests acá sería correrlos dos veces por el mismo commit.
+# No repite los tests de `ci.yml`: el que mergea a `main` es quien mira que estén en verde
+# (no hay protección de rama que lo obligue, ver ADR 0005).
 ##
 
 name: deploy
