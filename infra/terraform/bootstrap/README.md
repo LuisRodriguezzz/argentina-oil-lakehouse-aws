@@ -10,17 +10,17 @@ vivir en `../`: un `terraform destroy` de un ambiente se los llevaría puestos.
 | Proveedor OIDC de `token.actions.githubusercontent.com` | Que AWS acepte los tokens que emite GitHub Actions. |
 | Roles `argentina-oil-lakehouse-github-dev` y `-prod` | Lo que asume el workflow. Sin claves de acceso en los secretos del repo. |
 
-## Nada de esto está aplicado
+## Aplicado el 2026-09-12
 
-**Este directorio nunca se aplicó contra AWS.** Es la definición de lo que haría falta para
-que `.github/workflows/deploy.yml` deje de estar deshabilitado; hoy el state de `../` sigue
-siendo local y los despliegues se hacen a mano. Está en el repo porque la decisión ya está
-tomada y escrita (ADR 0005), no porque esté funcionando.
+Los diez recursos existen, el state de `../` vive en el bucket (los dos workspaces migrados
+con `terraform init -migrate-state`) y `deploy.yml` está habilitado con `DEPLOY_ENABLED =
+true`. El state de este directorio sigue siendo local, en `bootstrap/terraform.tfstate`: es
+el único que no puede guardarse en el bucket que él mismo crea.
 
-Aplicarlo cuesta prácticamente cero en reposo: S3 con unos KB de state y una tabla de
-DynamoDB en `PAY_PER_REQUEST` que solo se escribe durante un `apply`.
+En reposo cuesta prácticamente cero: S3 con unos KB de state y una tabla de DynamoDB en
+`PAY_PER_REQUEST` que solo se escribe durante un `apply`.
 
-## Cuando se quiera aplicar
+## Cómo se aplicó
 
 ```powershell
 cd infra\terraform\bootstrap

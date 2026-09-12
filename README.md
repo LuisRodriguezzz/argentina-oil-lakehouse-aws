@@ -76,7 +76,7 @@ las tablas calculadas sobre ella.
 | `pipelines/aws/` | Los **wrappers de Glue**: traducen argumentos del job a variables de entorno y resuelven el secreto por SSM, nunca en claro |
 | `infra/terraform/` | **IaC** completa: 29 recursos por ambiente, `terraform destroy` deja costo cero |
 | `.github/workflows/ci.yml` | **CI** en tres jobs: lint y tests (más el nombre del wheel que espera Terraform), `terraform fmt`/`validate` y `dbt parse` sin conexión. No toca AWS |
-| `.github/workflows/deploy.yml` | **CD por ambiente**: plan en el PR, apply de dev en `main`, prod con aprobación manual y OIDC (escrito, deshabilitado) |
+| `.github/workflows/deploy.yml` | **CD por ambiente**: plan en el PR, apply de dev en `main`, prod con aprobación manual y OIDC, sin claves en el repo |
 
 ## Correrlo en AWS
 
@@ -140,10 +140,11 @@ Lo que sigue son limitaciones reales del proyecto, no pendientes de redacción.
   números de "Resultados" son de `prod`. En `dev`, con 2 workers, la carga completa de
   producción no entra en el timeout de 60 minutos del job: es para probar cambios, no para
   reproducir el dataset.
-- **El despliegue sigue siendo manual.** El state es local,
-  `infra/terraform/bootstrap/` (backend S3, tabla de locks, roles de OIDC) nunca se aplicó y
-  `deploy.yml` está deshabilitado a propósito (`if: vars.DEPLOY_ENABLED == 'true'`, variable que
-  no existe) ([ADR 0005](docs/adr/0005-ambientes-dev-y-prod.md)).
+- **El despliegue es automático desde el 2026-09-12, y todavía no acumuló historia.** El
+  state vive en S3, `infra/terraform/bootstrap/` está aplicado y `deploy.yml` corre en cada
+  merge a `main`: dev solo, prod con aprobación manual y OIDC, sin claves en el repo
+  ([ADR 0005](docs/adr/0005-ambientes-dev-y-prod.md)). Lo que no hace es disparar los
+  pipelines: eso sigue siendo a mano o por los schedules, que están apagados.
 - **Los jobs de Glue no corren en paralelo.** Se comparten y admiten una corrida a la vez; el
   pipeline que llega segundo espera y reintenta en vez de fallar
   ([ADR 0001](docs/adr/0001-lakehouse-serverless-en-aws.md)).

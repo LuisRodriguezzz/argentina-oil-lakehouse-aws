@@ -85,17 +85,17 @@ aws ssm put-parameter --name /oil-lakehouse/dev/postgres_dsn --type SecureString
   --value "postgresql://..." --overwrite
 ```
 
-## Despliegue automático (deshabilitado)
+## Despliegue automático
 
-`.github/workflows/deploy.yml` hace, cuando está habilitado: `terraform plan` de dev en cada
-PR que toque `infra/terraform/**` o `pipelines/**`, `apply` de dev en cada push a `main` con
-subida del wheel, y un job de prod que depende del de dev y espera aprobación manual. Se
-autentica con OIDC (`role-to-assume`), sin claves en los secretos del repo.
+`.github/workflows/deploy.yml` hace: `terraform plan` de dev en cada PR que toque
+`infra/terraform/**` o `pipelines/**`, `apply` de dev en cada push a `main` con subida del
+wheel y los wrappers, y un job de prod que depende del de dev y espera aprobación manual en
+el GitHub Environment `prod`. Se autentica con OIDC (`role-to-assume`), sin claves en los
+secretos del repo. Está habilitado desde el 2026-09-12 (`DEPLOY_ENABLED = true`), con el
+state en S3: cómo se llegó ahí está en [`bootstrap/README.md`](bootstrap/README.md).
 
-Está deshabilitado por diseño: todos los jobs llevan `if: vars.DEPLOY_ENABLED == 'true'` y esa
-variable no existe. **No puede funcionar mientras el state sea local**: un runner de GitHub
-arranca vacío, no ve `terraform.tfstate.d/` y creería que no existe nada. Los cinco pasos para
-habilitarlo están en [`bootstrap/README.md`](bootstrap/README.md).
+Los comandos manuales de "Desplegar" siguen valiendo para una máquina de desarrollo; el
+candado en DynamoDB impide que un `apply` local y uno del workflow se pisen.
 
 ## Correr el pipeline
 
