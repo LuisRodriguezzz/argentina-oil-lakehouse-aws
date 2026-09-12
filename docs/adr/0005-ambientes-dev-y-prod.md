@@ -130,8 +130,9 @@ de aprobación que nadie mira. Cuando prod se rompa por algo que dev no vio, ent
   2026-09-12) y cargados: dev con producción acotada a 2024, prod con los 21 años. Cada uno
   tiene su propia base de Neon para el manifiesto (`oil_lakehouse_dev`, `oil_lakehouse_prod`,
   en el mismo branch): compartirla haría que la ingesta de un ambiente diera por descargados
-  los archivos del otro. El state sigue siendo local, `bootstrap/` nunca corrió y `deploy.yml`
-  está deshabilitado (`if: vars.DEPLOY_ENABLED == 'true'`, variable que no existe).
+  los archivos del otro. Desde el 2026-09-12 el state es remoto (`bootstrap/` aplicado) y
+  `deploy.yml` está habilitado: dev se despliega solo en cada merge a `main` y prod espera
+  una aprobación manual en el GitHub Environment.
 - El workflow no puede aplicar hasta que el state sea remoto: un runner de GitHub arranca vacío
   y con backend local creería que no existe nada. Aplicar `bootstrap/` es el primer paso de
   habilitarlo, no un extra.

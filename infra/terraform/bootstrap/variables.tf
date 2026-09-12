@@ -12,12 +12,14 @@ variable "region" {
 
 variable "github_repository" {
   description = <<-EOT
-    Repo que puede asumir los roles de despliegue, en formato `owner/repo`. Entra en la
-    trust policy del OIDC: cualquier otro repo, aunque use el mismo proveedor de GitHub,
-    recibe un AccessDenied al intentar asumirlos.
+    Repo que puede asumir los roles de despliegue, tal como GitHub lo escribe en el claim
+    `sub` del token OIDC: `owner@id/repo@id`, con el id numérico de cada uno (desde 2026
+    GitHub los incluye; visto en CloudTrail el 2026-09-12). Los ids no cambian aunque el
+    repo o la cuenta se renombren: `gh api repos/<owner>/<repo> --jq '.owner.id, .id'`.
+    Cualquier otro repo, aunque use el mismo proveedor de GitHub, recibe un AccessDenied.
   EOT
   type        = string
-  default     = "LuisRodriguezzz/argentina-oil-lakehouse-aws"
+  default     = "LuisRodriguezzz@131310791/argentina-oil-lakehouse-aws@1366578558"
 }
 
 variable "github_branch" {
