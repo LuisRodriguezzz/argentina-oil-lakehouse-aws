@@ -112,6 +112,12 @@ models:
           Suma de arena nacional e importada: una de las dos vacía no anula el total, pero si
           las dos vienen vacías queda nula, que no es lo mismo que un cero declarado.
 
+      - name: arena_por_etapa_tn
+        description: >
+          Toneladas de arena por etapa de fractura (arena total sobre cantidad de etapas).
+          Intensidad de proppant: permite comparar diseños de completación entre pozos.
+          Nula cuando falta la arena o las etapas.
+
       - name: agua_inyectada_m3
         description: "Agua bombeada en el tratamiento, en m3."
 
