@@ -49,10 +49,10 @@ CI/CD con OIDC y aprobación manual— en vez de un `terraform apply` a mano.
   ejecución por corrida— sin un servicio prendido: un entorno de MWAA es el recurso más caro que
   este proyecto podría tener (ADR 0001).
 
-**Qué agrega respecto del original, como pendiente.** Los tres pasos que faltan para que el
-despliegue sea real: aplicar dev y prod, mover el state de Terraform a S3 con la tabla de locks
-de `infra/terraform/bootstrap/`, y habilitar `deploy.yml` con los roles de OIDC (ADR 0005).
-Están escritos y validados; ninguno corrió contra AWS.
+**Qué agrega respecto del original.** El despliegue cloud completo, y los tres pasos ya
+corrieron contra AWS: dev y prod aplicados (2026-09-11 y 2026-09-12), el state de Terraform en
+S3 con la tabla de locks de `infra/terraform/bootstrap/`, y `deploy.yml` habilitado con los
+roles de OIDC (ADR 0005).
 
 ## Consecuencias
 
