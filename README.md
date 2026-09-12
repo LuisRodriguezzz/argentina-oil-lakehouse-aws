@@ -126,12 +126,13 @@ reconstruir de cero— está en el runbook [`infra/terraform/README.md`](infra/t
 
 Lo que sigue son limitaciones reales del proyecto, no pendientes de redacción.
 
-- **Solo `dev` está aplicado, y solo corrió fractura.** Los 29 recursos de dev se aplicaron el
-  2026-09-11 y `fractura_diaria` corrió en verde el 2026-09-12 con el mismo resultado que el
-  proyecto de origen: 4.890 filas leídas, 4.878 publicadas, 12 en cuarentena. El resto de los
-  números de arriba —producción, reservas, gold, tiempos y costos— sigue siendo la medición del
-  proyecto del que deriva (ADR 0006), con este mismo código y sin sufijo de ambiente, hasta que
-  `prod` se aplique y cargue.
+- **Solo `dev` está aplicado, con producción acotada a 2024.** Los 29 recursos se aplicaron el
+  2026-09-11 y el 2026-09-12 corrieron las cuatro máquinas en verde: fractura (4.890 leídas,
+  4.878 publicadas, 12 en cuarentena, igual que el origen), producción solo 2024 (983.709
+  filas, 1 en cuarentena), el padrón (86.197, igual que el origen), reservas y gold con sus 81
+  tests. Con 2 workers la carga completa de producción no entra en el timeout del job: los
+  números de 21 años de arriba siguen siendo la medición del proyecto de origen (ADR 0006)
+  hasta que `prod` se aplique y cargue.
 - **prod no existe y el despliegue sigue siendo manual.** El state es local,
   `infra/terraform/bootstrap/` (backend S3, tabla de locks, roles de OIDC) nunca se aplicó y
   `deploy.yml` está deshabilitado a propósito (`if: vars.DEPLOY_ENABLED == 'true'`, variable que
