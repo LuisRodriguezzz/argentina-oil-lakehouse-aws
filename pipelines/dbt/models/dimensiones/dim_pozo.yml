@@ -86,9 +86,17 @@ models:
 
       - name: primera_produccion
         description: >
-          Primer día del mes de la primera producción del pozo, del padrón de Capítulo IV. El
-          padrón solo trae el mes real en el año en curso; en los años cerrados viene enero
-          (ver docs/fuentes/pozo_primera_produccion.md). Nula si el pozo no figura en el padrón.
+          Primer día del primer mes en que el pozo declaró petróleo o gas mayor a cero. Se
+          calcula desde `silver.produccion_pozo` y es el origen de `meses_desde_primera_produccion`
+          y de los acumulados de los marts. Nula si el pozo nunca produjo (inyectores, secos, en
+          estudio). Igual en todos los tramos del pozo.
+
+      - name: primera_produccion_padron
+        description: >
+          Primer día del mes de la primera producción según el padrón de Capítulo IV, tal como lo
+          publica la Secretaría. Solo el año es confiable: el portal pisa el mes con enero en los
+          años cerrados (ver docs/fuentes/pozo_primera_produccion.md). Se conserva para cruzar
+          con `primera_produccion`. Nula si el pozo no figura en el padrón.
 
       - name: vigente_desde
         description: "Primer día del primer mes del tramo."

@@ -18,15 +18,9 @@ models:
       petróleo de las cohortes con más pozos gasíferos. Filtrar por `tipopozo` da una curva
       por fluido, que es como se usa en la industria.
 
-      **Qué queda afuera.** La cohorte 2006: el padrón de primera producción vuelca ahí a los
-      63.448 pozos anteriores al registro (ver docs/fuentes/pozo_primera_produccion.md), así
-      que su "mes 0" no es un arranque real y la curva sería un número inventado.
-
-      **El mes 0 es enero en los años cerrados.** El padrón solo trae el mes real de la
-      primera producción en el año en curso; en los demás viene enero (misma ficha). Hasta que
-      gold calcule la primera producción desde las declaraciones, el eje de meses arranca en
-      enero del año de la cohorte y no en el mes real de cada pozo: por eso el mes 0 tiene
-      pocos pozos y el acumulado del mes 11 es la producción del primer año calendario.
+      **Qué queda afuera.** La cohorte 2006: la serie de producción arranca en enero de 2006,
+      así que todo pozo anterior aparece produciendo por primera vez ese mes, su "mes 0" no es
+      un arranque real y la curva sería un número inventado.
 
       **Meses sin declaración.** Si un pozo no declaró un mes, no cuenta en ese mes y su
       acumulado del mes siguiente suma solo lo declarado. No se rellenan huecos. Por eso
@@ -52,7 +46,7 @@ models:
         description: "Destino actual del pozo (Petrolífero, Gasífero, etc.). Parte del grano: separa las ventanas de petróleo y gas."
 
       - name: meses_desde_primera_produccion
-        description: "Mes de vida del pozo, de 0 (mes de la primera producción según el padrón) a 35. Parte del grano."
+        description: "Mes de vida del pozo, de 0 (primer mes con producción mayor a cero) a 35. Parte del grano."
         data_tests: [not_null]
 
       - name: pozos_con_declaracion

@@ -107,10 +107,22 @@ vigencias as (
     from resumen
 ),
 
+-- La primera producción se calcula desde las declaraciones: el primer mes con petróleo o gas
+-- mayor a cero. El padrón de Capítulo IV también la publica, pero con el mes pisado a enero en
+-- los años cerrados (docs/fuentes/pozo_primera_produccion.md); se conserva aparte como cruce.
+primer_mes_con_produccion as (
+    select
+        idpozo,
+        min({{ make_date('anio', 'mes', 1) }}) as primera_produccion
+    from {{ source('silver', 'produccion_pozo') }}
+    where prod_pet > 0 or prod_gas > 0
+    group by idpozo
+),
+
 padron as (
     select
         idpozo,
-        {{ make_date('anio', 'mes', 1) }} as primera_produccion
+        {{ make_date('anio', 'mes', 1) }} as primera_produccion_padron
     from {{ source('silver', 'pozo_primera_produccion') }}
 )
 
@@ -129,7 +141,8 @@ select
     v.idareayacimiento,
     {{ md5('v.idareayacimiento') }} as yacimiento_key,
     v.profundidad,
-    p.primera_produccion,
+    m.primera_produccion,
+    p.primera_produccion_padron,
     v.vigente_desde,
     -- El tramo vigente no tiene fin: se cierra el día que el pozo declare algo distinto.
     case when v.es_vigente then null else {{ fin_de_mes('v.ultimo_mes') }} end as vigente_hasta,
@@ -137,4 +150,5 @@ select
     -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
     'derived' as data_origin
 from vigencias v
+left join primer_mes_con_produccion m on v.idpozo = m.idpozo
 left join padron p on v.idpozo = p.idpozo

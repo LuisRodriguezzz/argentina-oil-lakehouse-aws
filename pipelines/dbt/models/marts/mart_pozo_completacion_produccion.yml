@@ -11,7 +11,7 @@ models:
       Solo entran pozos con al menos una fractura declarada. De las varias declaraciones que
       puede tener un pozo se toma la última, que es la que describe cómo quedó terminado. Los
       acumulados pueden venir nulos: un pozo fracturado hace tres meses todavía no tiene 12
-      meses de historia, y uno que no figura en el padrón de primera producción no tiene desde
+      meses de historia, y uno que todavía no declaró producción mayor a cero no tiene desde
       cuándo contar.
 
       Está a nivel pozo y no a nivel pozo-mes a propósito: una fila por unidad de observación
@@ -61,13 +61,15 @@ models:
         description: "Profundidad del pozo en metros."
 
       - name: primera_produccion
-        description: "Primer día del mes de la primera producción. Es el origen de los acumulados."
+        description: >
+          Primer día del primer mes con petróleo o gas mayor a cero (`dim_pozo.primera_produccion`).
+          Es el origen de los acumulados. Nula si el pozo todavía no produjo.
 
       - name: anio_primera_produccion
         description: >
           Año de la primera producción: la cohorte del pozo. Los pozos se comparan contra los
           que arrancaron el mismo año, porque el diseño de completación cambia año a año. Nula
-          si el pozo no figura en el padrón.
+          si el pozo todavía no produjo.
 
       - name: fecha_inicio_fractura
         description: "Inicio de la última fractura declarada del pozo."
@@ -107,12 +109,7 @@ models:
         description: "Petróleo acumulado en los primeros 6 meses, en m3."
 
       - name: prod_pet_12m
-        description: >
-          Petróleo acumulado en los primeros 12 meses, en m3. Es la variable a explicar. Con el
-          padrón actual, los "12 meses" van de enero a diciembre del año de arranque, porque el
-          padrón pisa el mes con enero en los años cerrados (ver
-          docs/fuentes/pozo_primera_produccion.md): un pozo que arrancó en octubre tiene tres
-          meses adentro.
+        description: "Petróleo acumulado en los primeros 12 meses, en m3. Es la variable a explicar."
 
       - name: prod_gas_3m
         description: "Gas acumulado en los primeros 3 meses, en Mm3."
