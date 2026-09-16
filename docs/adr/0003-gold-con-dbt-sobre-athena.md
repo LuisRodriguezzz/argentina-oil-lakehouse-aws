@@ -5,8 +5,8 @@
 ## Contexto
 
 Bronze y silver son jobs de PySpark: leen una tabla, aplican reglas y escriben otra (ADR 0002).
-Gold es distinto. Son ocho modelos dimensionales que dependen unos de otros —cuatro
-dimensiones, tres tablas de hechos y un mart—, cada uno con su documentación y sus tests, y lo
+Gold es distinto. Son nueve modelos dimensionales que dependen unos de otros —cuatro
+dimensiones, tres tablas de hechos y dos marts—, cada uno con su documentación y sus tests, y lo
 que hay que poder contestar es "de dónde sale esta columna". Además `dim_pozo` es una SCD tipo
 2 sobre 21 años de declaraciones: hay que generar tramos de vigencia y verificar que no se
 solapen. Escribir eso como otro job de PySpark significaría reimplementar a mano el grafo de
@@ -22,11 +22,12 @@ escribe las mismas tablas Iceberg del Glue Data Catalog que produce silver, no h
 levantar y se paga por TB escaneado. La alternativa era `dbt-glue`, que lanza una sesión
 interactiva de Glue por corrida: más caro y un motor más que mantener para el mismo resultado.
 
-Los tests van con los modelos: `unique`, `not_null` y `relationships` en los YAML, más cuatro
-tests singulares en SQL (grano único de los hechos, vigencias de `dim_pozo` sin solapamiento y
-una reconciliación de la producción 2024 contra silver). Son 81 tests que corren en el mismo
-`dbt build` que construye las tablas, así que una tabla mal construida no queda publicada en
-silencio.
+Los tests van con los modelos: `unique`, `not_null` y `relationships` en los YAML, más nueve
+tests singulares en SQL (grano único de los hechos y de la curva tipo, vigencias de `dim_pozo`
+sin solapamiento, cocientes y medidas no negativas, la cohorte igual al año de la primera
+producción y una reconciliación de la producción 2024 contra silver). Son 90 tests que corren
+en el mismo `dbt build` que construye las tablas, así que una tabla mal construida no queda
+publicada en silencio.
 
 **Un job de Glue `gold_dbt` que corre `dbt build --target aws`, sobre Glue 5.0 (Spark) y no
 sobre Python shell, aunque Spark no se use.** dbt necesita un proceso donde correr y el
@@ -48,12 +49,13 @@ orquestadores, `aws_logs.ps1` no la vería y no habría forma de encadenar gold 
 fuentes. La comodidad de tener una sola máquina de estados vale más que 15 centavos.
 
 **Las funciones de Trino con nombre corto viven en `macros/funciones_trino.sql`.** Athena es
-Trino, y siete operaciones frecuentes se escriben ahí de forma larga o poco evidente:
+Trino, y ocho operaciones frecuentes se escriben ahí de forma larga o poco evidente:
 `md5` toma y devuelve varbinary, no hay forma de armar una fecha desde tres enteros, `unnest` va
-en el `FROM` y no en el `SELECT`. Cada una es una macro de tres líneas, con su porqué al lado,
-para que el modelo se lea por lo que hace y no por cómo se deletrea; tres de ellas —`fin_de_mes`,
-`dias_entre` y `meses_entre`— no llevan el nombre de la función de Trino porque dbt-core ya
-publica macros `last_day` y `datediff` propias y redefinirlas se las cambiaría también a dbt.
+en el `FROM` y no en el `SELECT`, no existe `median` y la mediana es `approx_percentile`. Cada
+una es una macro de tres líneas, con su porqué al lado, para que el modelo se lea por lo que
+hace y no por cómo se deletrea; tres de ellas —`fin_de_mes`, `dias_entre` y `meses_entre`— no
+llevan el nombre de la función de Trino porque dbt-core ya publica macros `last_day` y
+`datediff` propias y redefinirlas se las cambiaría también a dbt.
 
 Con un solo motor el archivo podría no existir, pero sigue ganándose el lugar por la misma razón
 que `macros/claves.sql`: hay expresiones que tienen que escribirse una sola vez o dejan de

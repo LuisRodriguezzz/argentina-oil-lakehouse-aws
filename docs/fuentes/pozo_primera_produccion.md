@@ -48,6 +48,19 @@ DDJJ abiertas y cerradas (no con la familia normal, congelada desde marzo).
     que semana 0 ya había identificado como pozos que no producen.
   - Ningún pozo tiene `anio=2024` en el padrón y falta en la producción de 2024: los pozos que
     arrancan un año siempre tienen al menos una fila ese mismo año.
+- **El mes solo es real en el año en curso** (medido el 2026-09-16 sobre silver en prod):
+  85.810 de los 86.197 pozos (99,55 %) tienen `mes=1`. Los 387 restantes están entre febrero y
+  noviembre y coinciden con los pozos de 2026; para esos, el padrón es igual al primer mes
+  declarado en `produccion_pozo` en el 100 % de los casos. Es decir: el padrón registra el mes
+  de la primera DDJJ, y el portal lo pisa con enero cuando el año cierra. El año sí se
+  conserva: coincide con el del primer mes con producción mayor a cero en el 74-88 % de los
+  pozos según la cohorte; el resto declaró un año y produjo recién al siguiente, o nunca
+  produjo (inyectores, secos).
+  Consecuencia en gold: `primera_produccion`, y todo lo que se mide desde ahí
+  (`meses_desde_primera_produccion`, `prod_*_12m` del mart de pozos, la curva tipo), arranca en
+  enero del año de arranque y no en el mes real. Pendiente: calcular la primera producción en
+  gold como el primer mes con `prod_pet + prod_gas > 0` de `produccion_pozo` y dejar el padrón
+  como cruce.
 
 ## Decisiones del contrato
 

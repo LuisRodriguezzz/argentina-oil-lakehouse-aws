@@ -87,8 +87,11 @@ models:
 
       - name: meses_desde_primera_produccion
         description: >
-          Edad del pozo en meses: 0 es el mes de su primera producción. Nula si el pozo no
-          figura en el padrón de Capítulo IV, que no cubre a todos los que declaran.
+          Edad del pozo en meses: 0 es el mes de su primera producción según el padrón. Como el
+          padrón solo trae el mes real en el año en curso (ver
+          docs/fuentes/pozo_primera_produccion.md), en los años cerrados 0 es enero del año de
+          arranque y no el mes real. Nula si el pozo no figura en el padrón, que no cubre a
+          todos los que declaran.
 
       - name: data_origin
         description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."

@@ -72,7 +72,7 @@ las tablas calculadas sobre ella.
 | `pipelines/spark_jobs/bronze_load.py` | Carga cruda con **linaje** por fila y reemplazo de partición por recurso |
 | `pipelines/contracts/` + `silver_load.py` | **Contratos de datos** declarativos: tipos, rangos, checks duros y cuarentena auditable |
 | `pipelines/reservas/` | El caso raro: un **Excel de doble entrada** con 7 filas de encabezado y rangos fusionados, parseado por vocabulario y escrito con pyiceberg |
-| `pipelines/dbt/` | Modelo dimensional con **SCD tipo 2** sobre 21 años, 81 tests y documentación por columna |
+| `pipelines/dbt/` | Modelo dimensional con **SCD tipo 2** sobre 21 años, 90 tests y documentación por columna |
 | `pipelines/aws/` | Los **wrappers de Glue**: traducen argumentos del job a variables de entorno y resuelven el secreto por SSM, nunca en claro |
 | `infra/terraform/` | **IaC** completa: 29 recursos por ambiente, `terraform destroy` deja costo cero |
 | `.github/workflows/ci.yml` | **CI** en tres jobs: lint y tests (más el nombre del wheel que espera Terraform), `terraform fmt`/`validate` y `dbt parse` sin conexión. No toca AWS |
@@ -128,7 +128,7 @@ Casi todo el tiempo es la descarga del portal. El costo de esa reconstrucción c
   menos de 20 etapas de fractura y los de más de 40 (cuenca Neuquina).
 - **CI en verde**: 138 tests de Python, `ruff check`, `ruff format --check`, `dbt parse`,
   `terraform fmt` y `terraform validate`.
-- **81 tests de dbt en verde**, que corren dentro del job de gold y no en el CI: construir gold
+- **90 tests de dbt en verde**, que corren dentro del job de gold y no en el CI: construir gold
   necesita la cuenta de AWS.
 
 ## Qué se verificó y qué no
