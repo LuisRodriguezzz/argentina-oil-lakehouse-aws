@@ -9,8 +9,8 @@
 -- separa los petrolíferos de los gasíferos: en una misma formación conviven las dos ventanas y
 -- mezclarlas hunde la curva de petróleo de las cohortes con más pozos de gas.
 --
--- La cohorte 2006 queda afuera: el padrón vuelca ahí a los 63.448 pozos anteriores al
--- registro (docs/fuentes/pozo_primera_produccion.md), así que su "mes 0" no es un arranque real.
+-- La cohorte 2006 queda afuera: la serie de producción arranca en enero de 2006, así que todo
+-- pozo anterior aparece produciendo por primera vez ese mes y su "mes 0" no es un arranque real.
 
 -- Acumulado por pozo con una suma ventana: el orden por mes de vida no tiene empates porque
 -- pozo-mes es el grano de la fact.

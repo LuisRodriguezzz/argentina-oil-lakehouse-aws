@@ -29,23 +29,18 @@ with produccion as (
 ),
 
 -- Cada mes se cuelga del tramo de dim_pozo que estaba vigente entonces: es un join por rango
--- sobre `idpozo`, la forma estándar de cargar un hecho contra una dimensión SCD tipo 2.
+-- sobre `idpozo`, la forma estándar de cargar un hecho contra una dimensión SCD tipo 2. De la
+-- dimensión viene también la primera producción del pozo, que es la misma en todos sus tramos.
 con_pozo as (
     select
         p.*,
-        d.pozo_key
+        d.pozo_key,
+        d.primera_produccion
     from produccion p
     left join {{ ref('dim_pozo') }} d
         on p.idpozo = d.idpozo
         and p.mes_declarado >= d.vigente_desde
         and (d.vigente_hasta is null or p.mes_declarado <= d.vigente_hasta)
-),
-
-padron as (
-    select
-        idpozo,
-        {{ make_date('anio', 'mes', 1) }} as primera_produccion
-    from {{ source('silver', 'pozo_primera_produccion') }}
 )
 
 select
@@ -64,10 +59,9 @@ select
     c.iny_co2,
     c.iny_otro,
     c.tef,
-    -- Edad del pozo en meses: 0 es el mes de su primera producción. Nula si el pozo no figura
-    -- en el padrón, que no cubre a todos los que declaran.
-    {{ meses_entre('p.primera_produccion', 'c.mes_declarado') }} as meses_desde_primera_produccion,
+    -- Edad del pozo en meses: 0 es el primer mes con petróleo o gas mayor a cero (ver dim_pozo).
+    -- Nula si el pozo nunca produjo; negativa en los meses que declaró antes de producir.
+    {{ meses_entre('c.primera_produccion', 'c.mes_declarado') }} as meses_desde_primera_produccion,
     -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
     'derived' as data_origin
 from con_pozo c
-left join padron p on c.idpozo = p.idpozo

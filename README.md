@@ -43,7 +43,7 @@ entre corridas ([ADR 0001](docs/adr/0001-lakehouse-serverless-en-aws.md)).
 | `pipelines/spark_jobs/bronze_load.py` | Carga cruda con linaje por fila y reemplazo de la partición del recurso. |
 | [`pipelines/contracts/`](pipelines/contracts/README.md) | Contratos de datos en YAML: tipos, rangos, checks duros y cuarentena auditable. |
 | `pipelines/reservas/` | Un Excel de doble entrada, con 7 filas de encabezado y rangos fusionados, parseado por vocabulario. |
-| `pipelines/dbt/` | Modelo dimensional con SCD tipo 2 sobre 21 años: 9 modelos, 90 tests y documentación por columna. |
+| `pipelines/dbt/` | Modelo dimensional con SCD tipo 2 sobre 21 años: 9 modelos, 91 tests y documentación por columna. |
 | `pipelines/aws/` | Wrappers de Glue: traducen los argumentos del job a variables de entorno y resuelven el secreto por SSM. |
 | [`infra/terraform/`](infra/terraform/README.md) | 29 recursos por ambiente, dev y prod con workspaces; `terraform destroy` deja costo cero. |
 | [`infra/terraform/bootstrap/`](infra/terraform/bootstrap/README.md) | State remoto en S3 con bloqueo en DynamoDB, y los dos roles de OIDC del despliegue. |

@@ -17,7 +17,10 @@ sources:
         description: "Producción mensual declarada por pozo (DDJJ), 2006 en adelante. Grano pozo-mes."
 
       - name: pozo_primera_produccion
-        description: "Padrón de pozos con el año y mes en que produjeron por primera vez."
+        description: >
+          Padrón de pozos con el año y mes en que produjeron por primera vez. Solo el año es
+          confiable (el portal pisa el mes con enero en los años cerrados): gold calcula la
+          primera producción desde `produccion_pozo` y guarda esta fecha aparte, como cruce.
 
       - name: fractura
         description: "Operaciones de fractura del Adjunto IV. Una fila por tratamiento declarado."
