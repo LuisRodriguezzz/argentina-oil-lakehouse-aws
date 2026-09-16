@@ -23,11 +23,11 @@ levantar y se paga por TB escaneado. La alternativa era `dbt-glue`, que lanza un
 interactiva de Glue por corrida: más caro y un motor más que mantener para el mismo resultado.
 
 Los tests van con los modelos: `unique`, `not_null` y `relationships` en los YAML, más nueve
-tests singulares en SQL (grano único de los hechos y de la curva tipo, vigencias de `dim_pozo`
-sin solapamiento, cocientes y medidas no negativas, la cohorte igual al año de la primera
-producción y una reconciliación de la producción 2024 contra silver). Son 90 tests que corren
-en el mismo `dbt build` que construye las tablas, así que una tabla mal construida no queda
-publicada en silencio.
+tests singulares en SQL (grano único de dos hechos y de la curva tipo, vigencias de `dim_pozo`
+sin solapamiento, arena por etapa, cocientes y medidas no negativas, la cohorte igual al año de
+la primera producción y una reconciliación de la producción 2024 contra silver). Son 90 tests
+que corren en el mismo `dbt build` que construye las tablas, así que una tabla mal construida
+no queda publicada en silencio.
 
 **Un job de Glue `gold_dbt` que corre `dbt build --target aws`, sobre Glue 5.0 (Spark) y no
 sobre Python shell, aunque Spark no se use.** dbt necesita un proceso donde correr y el
@@ -72,9 +72,9 @@ lugares del mismo modelo. Una definición por operación, y los modelos se leen 
   `athena-results/`, que es donde dbt-athena los pondría por defecto y donde la regla de ciclo
   de vida del bucket los borraría a los siete días.
 - El job de gold instala unos cincuenta paquetes en cada corrida (dbt y el wheel con sus
-  dependencias). Medido el 2026-09-06 en el proyecto de origen (ADR 0006): 197 s de job, de los
-  cuales 81 son el `dbt build` —los 8 modelos y sus tests, todos en verde— y el resto arranque
-  del clúster e instalación. Es el precio de no mantener una imagen propia.
+  dependencias). Medido en `prod` el 2026-09-12: 4 minutos de job para los 8 modelos y sus
+  tests, todos en verde. Buena parte es arranque del clúster e instalación, no `dbt build`. Es
+  el precio de no mantener una imagen propia.
 - Un modelo nuevo no necesita `terraform apply`: el proyecto de dbt viaja en el wheel, así que
   alcanza con volver a correr `scripts/aws_deploy.ps1`.
 - `dbt docs` no se genera. El catálogo y el manifiesto quedarían en el disco efímero del job de
