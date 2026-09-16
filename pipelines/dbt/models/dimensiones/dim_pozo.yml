@@ -85,7 +85,10 @@ models:
         description: "Profundidad del pozo en metros. Último valor del tramo, no rastreado."
 
       - name: primera_produccion
-        description: "Primer día del mes de la primera producción del pozo, del padrón de Capítulo IV. Nula si el pozo no figura en el padrón."
+        description: >
+          Primer día del mes de la primera producción del pozo, del padrón de Capítulo IV. El
+          padrón solo trae el mes real en el año en curso; en los años cerrados viene enero
+          (ver docs/fuentes/pozo_primera_produccion.md). Nula si el pozo no figura en el padrón.
 
       - name: vigente_desde
         description: "Primer día del primer mes del tramo."

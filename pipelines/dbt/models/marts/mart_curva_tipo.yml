@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: mart_curva_tipo
+    description: >
+      Curva tipo por cohorte: la producción acumulada que lleva un pozo "típico" a cada mes de
+      vida, entre los pozos que arrancaron el mismo año en la misma formación, subtipo de
+      recurso y tipo de pozo. Es la tabla con la que se comparan generaciones de pozos: la de
+      2018 contra la de 2022 a los 12 meses, por ejemplo.
+
+      El grano es cohorte × formación × subtipo × tipo de pozo × mes de vida, con el mes de 0
+      a 35. Por fila, cuántos pozos declararon ese mes y la media y la mediana de su acumulado
+      de petróleo y gas hasta ahí. El acumulado se calcula primero por pozo, con una suma
+      ventana sobre `fact_produccion_mensual`, y recién después se agrega.
+
+      **Por qué el tipo de pozo está en el grano.** En una misma formación conviven la ventana
+      de petróleo y la de gas (Vaca Muerta tiene las dos), y mezclarlas hunde la curva de
+      petróleo de las cohortes con más pozos gasíferos. Filtrar por `tipopozo` da una curva
+      por fluido, que es como se usa en la industria.
+
+      **Qué queda afuera.** La cohorte 2006: el padrón de primera producción vuelca ahí a los
+      63.448 pozos anteriores al registro (ver docs/fuentes/pozo_primera_produccion.md), así
+      que su "mes 0" no es un arranque real y la curva sería un número inventado.
+
+      **El mes 0 es enero en los años cerrados.** El padrón solo trae el mes real de la
+      primera producción en el año en curso; en los demás viene enero (misma ficha). Hasta que
+      gold calcule la primera producción desde las declaraciones, el eje de meses arranca en
+      enero del año de la cohorte y no en el mes real de cada pozo: por eso el mes 0 tiene
+      pocos pozos y el acumulado del mes 11 es la producción del primer año calendario.
+
+      **Meses sin declaración.** Si un pozo no declaró un mes, no cuenta en ese mes y su
+      acumulado del mes siguiente suma solo lo declarado. No se rellenan huecos. Por eso
+      la cantidad de pozos puede bajar y volver a subir de un mes al otro, y por eso la
+      mediana no es necesariamente creciente con el mes: el conjunto de pozos cambia.
+
+      `formacion`, `sub_tipo_recurso` y `tipopozo` salen del tramo vigente de `dim_pozo`,
+      igual que en `mart_pozo_completacion_produccion`: las dos tablas se filtran con los
+      mismos valores.
+
+    columns:
+      - name: anio_primera_produccion
+        description: "Año de la primera producción: la cohorte. Parte del grano."
+        data_tests: [not_null]
+
+      - name: formacion
+        description: "Formación productiva actual del pozo. Parte del grano; nula en los pozos que no la declaran."
+
+      - name: sub_tipo_recurso
+        description: "SHALE o TIGHT en el no convencional; nula en el convencional. Parte del grano."
+
+      - name: tipopozo
+        description: "Destino actual del pozo (Petrolífero, Gasífero, etc.). Parte del grano: separa las ventanas de petróleo y gas."
+
+      - name: meses_desde_primera_produccion
+        description: "Mes de vida del pozo, de 0 (mes de la primera producción según el padrón) a 35. Parte del grano."
+        data_tests: [not_null]
+
+      - name: pozos_con_declaracion
+        description: >
+          Pozos del grupo que declararon producción ese mes. Es el tamaño de la muestra detrás
+          de la media y la mediana: con pocos pozos, la curva no es representativa.
+        data_tests: [not_null]
+
+      - name: prod_pet_acum_media
+        description: "Media del petróleo acumulado por pozo hasta ese mes, en m3."
+
+      - name: prod_pet_acum_mediana
+        description: "Mediana del petróleo acumulado por pozo hasta ese mes, en m3. Aproximada (`approx_percentile`)."
+
+      - name: prod_gas_acum_media
+        description: "Media del gas acumulado por pozo hasta ese mes, en Mm3."
+
+      - name: prod_gas_acum_mediana
+        description: "Mediana del gas acumulado por pozo hasta ese mes, en Mm3. Aproximada (`approx_percentile`)."
+
+      - name: data_origin
+        description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["derived"]

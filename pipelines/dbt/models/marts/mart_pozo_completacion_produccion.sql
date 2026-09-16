@@ -68,6 +68,7 @@ select
     p.sub_tipo_recurso,
     p.profundidad,
     p.primera_produccion,
+    cast(year(p.primera_produccion) as integer) as anio_primera_produccion,
 
     f.fecha_inicio_fractura,
     f.tipo_terminacion,
@@ -87,6 +88,9 @@ select
     a.prod_gas_6m,
     a.prod_gas_12m,
     a.meses_con_declaracion,
+    a.prod_pet_12m / nullif(f.longitud_rama_horizontal_m, 0) as prod_pet_12m_por_metro,
+    a.prod_pet_12m / nullif(f.cantidad_fracturas, 0) as prod_pet_12m_por_etapa,
+    f.arena_bombeada_total_tn / nullif(f.longitud_rama_horizontal_m, 0) as arena_por_metro_tn,
     -- Toda tabla del lakehouse declara su origen: gold se calcula a partir de silver.
     'derived' as data_origin
 from ultima_fractura f

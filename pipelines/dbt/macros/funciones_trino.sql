@@ -55,3 +55,10 @@
     select {{ alias }} from unnest(sequence({{ desde }}, {{ hasta }}, interval '1' month)) as t({{ alias }})
 {%- endmacro %}
 
+
+{% macro mediana(expresion) -%}
+    {# Trino no tiene `median`. `approx_percentile` es aproximada (T-digest); para comparar
+       curvas tipo el error es despreciable frente a la dispersión entre pozos. #}
+    approx_percentile({{ expresion }}, 0.5)
+{%- endmacro %}
+

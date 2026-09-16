@@ -63,6 +63,12 @@ models:
       - name: primera_produccion
         description: "Primer día del mes de la primera producción. Es el origen de los acumulados."
 
+      - name: anio_primera_produccion
+        description: >
+          Año de la primera producción: la cohorte del pozo. Los pozos se comparan contra los
+          que arrancaron el mismo año, porque el diseño de completación cambia año a año. Nula
+          si el pozo no figura en el padrón.
+
       - name: fecha_inicio_fractura
         description: "Inicio de la última fractura declarada del pozo."
         data_tests: [not_null]
@@ -101,7 +107,12 @@ models:
         description: "Petróleo acumulado en los primeros 6 meses, en m3."
 
       - name: prod_pet_12m
-        description: "Petróleo acumulado en los primeros 12 meses, en m3. Es la variable a explicar."
+        description: >
+          Petróleo acumulado en los primeros 12 meses, en m3. Es la variable a explicar. Con el
+          padrón actual, los "12 meses" van de enero a diciembre del año de arranque, porque el
+          padrón pisa el mes con enero en los años cerrados (ver
+          docs/fuentes/pozo_primera_produccion.md): un pozo que arrancó en octubre tiene tres
+          meses adentro.
 
       - name: prod_gas_3m
         description: "Gas acumulado en los primeros 3 meses, en Mm3."
@@ -116,6 +127,23 @@ models:
         description: >
           Cuántos de los primeros 12 meses tienen declaración. Sirve para descartar pozos con
           historia incompleta: 12 es una serie completa.
+
+      - name: prod_pet_12m_por_metro
+        description: >
+          Petróleo de los primeros 12 meses por metro de rama horizontal, en m3/m. Deja
+          comparables pozos de distinta longitud. Nula en los verticales (rama 0) y cuando
+          falta alguno de los dos términos.
+
+      - name: prod_pet_12m_por_etapa
+        description: >
+          Petróleo de los primeros 12 meses por etapa de fractura, en m3 por etapa. Nula
+          cuando el pozo no declara etapas o no tiene 12 meses de producción.
+
+      - name: arena_por_metro_tn
+        description: >
+          Toneladas de arena por metro de rama horizontal. Intensidad de la completación por
+          longitud; complementa `arena_por_etapa_tn` de fact_fractura. Nula en los verticales
+          y cuando falta la arena.
 
       - name: data_origin
         description: "Origen del dato: `derived`, porque gold se calcula; bronze y silver declaran `real`."
