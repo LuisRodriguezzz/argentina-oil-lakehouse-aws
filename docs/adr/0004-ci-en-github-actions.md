@@ -26,7 +26,7 @@ AWS**:
   una corrida.
 - `dbt`: `dbt parse`, que compila el proyecto entero sin conectarse a Athena y atrapa un `ref()`
   a un modelo que no existe, un `.yml` que documenta un modelo que ya no está o una macro mal
-  escrita. El `build` y los 90 tests necesitan la cuenta y corren en el job de gold (ADR 0003).
+  escrita. El `build` y los 91 tests necesitan la cuenta y corren en el job de gold (ADR 0003).
 - `terraform`: `terraform fmt -check -recursive`, `terraform init -backend=false` y
   `terraform validate`, sobre `infra/terraform/` y también sobre `infra/terraform/bootstrap/`,
   que es un directorio raíz aparte con su propio provider y su propio state. Sin credenciales y

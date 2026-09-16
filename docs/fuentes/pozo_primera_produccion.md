@@ -3,8 +3,10 @@
 Recurso "Padrón de Pozos de Capítulo IV con fecha de primera producción" del mismo dataset
 CKAN `produccion-de-petroleo-y-gas-por-pozo` que [`produccion_pozo.md`](produccion_pozo.md).
 Es el único recurso agregado del dataset que no viene partido por año: un solo CSV con **una
-fila por pozo**, con el año y mes en que ese pozo produjo por primera vez. Sirve para calcular
-la edad del pozo y las curvas de declino en gold (según el contrato).
+fila por pozo**, con el año y mes en que ese pozo produjo por primera vez. Iba a ser el origen
+de la edad del pozo en gold, pero el mes no es confiable (ver "Rarezas medidas"): gold calcula
+la primera producción desde las declaraciones y guarda la del padrón aparte, como cruce
+(`dim_pozo.primera_produccion_padron`).
 
 Medido el 2026-09-06 sobre el CSV descargado del portal, en el proyecto de origen (ADR 0006):
 **86.197 filas, 3 columnas**, 1,2 MB.
@@ -56,11 +58,11 @@ DDJJ abiertas y cerradas (no con la familia normal, congelada desde marzo).
   conserva: coincide con el del primer mes con producción mayor a cero en el 74-88 % de los
   pozos según la cohorte; el resto declaró un año y produjo recién al siguiente, o nunca
   produjo (inyectores, secos).
-  Consecuencia en gold: `primera_produccion`, y todo lo que se mide desde ahí
-  (`meses_desde_primera_produccion`, `prod_*_12m` del mart de pozos, la curva tipo), arranca en
-  enero del año de arranque y no en el mes real. Pendiente: calcular la primera producción en
-  gold como el primer mes con `prod_pet + prod_gas > 0` de `produccion_pozo` y dejar el padrón
-  como cruce.
+  Consecuencia en gold: `dim_pozo.primera_produccion` se calcula desde `produccion_pozo` como
+  el primer mes con `prod_pet > 0 or prod_gas > 0`, y de ahí salen `meses_desde_primera_produccion`,
+  los `prod_*_12m` del mart de pozos y la curva tipo. La fecha del padrón queda en
+  `dim_pozo.primera_produccion_padron` para cruzar. Hasta el 2026-09-16 gold usaba el padrón, y
+  "12 meses" era en realidad "hasta diciembre del año de arranque".
 
 ## Decisiones del contrato
 

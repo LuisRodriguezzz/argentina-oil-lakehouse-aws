@@ -22,12 +22,13 @@ escribe las mismas tablas Iceberg del Glue Data Catalog que produce silver, no h
 levantar y se paga por TB escaneado. La alternativa era `dbt-glue`, que lanza una sesión
 interactiva de Glue por corrida: más caro y un motor más que mantener para el mismo resultado.
 
-Los tests van con los modelos: `unique`, `not_null` y `relationships` en los YAML, más nueve
+Los tests van con los modelos: `unique`, `not_null` y `relationships` en los YAML, más diez
 tests singulares en SQL (grano único de dos hechos y de la curva tipo, vigencias de `dim_pozo`
 sin solapamiento, arena por etapa, cocientes y medidas no negativas, la cohorte igual al año de
-la primera producción y una reconciliación de la producción 2024 contra silver). Son 90 tests
-que corren en el mismo `dbt build` que construye las tablas, así que una tabla mal construida
-no queda publicada en silencio.
+la primera producción, la primera producción como primer mes con producción y una
+reconciliación de la producción 2024 contra silver). Son 91 tests que corren en el mismo
+`dbt build` que construye las tablas, así que una tabla mal construida no queda publicada en
+silencio.
 
 **Un job de Glue `gold_dbt` que corre `dbt build --target aws`, sobre Glue 5.0 (Spark) y no
 sobre Python shell, aunque Spark no se use.** dbt necesita un proceso donde correr y el
