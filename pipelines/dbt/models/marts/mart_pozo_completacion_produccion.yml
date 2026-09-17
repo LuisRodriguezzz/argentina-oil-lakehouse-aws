@@ -8,11 +8,20 @@ models:
       la pregunta del proyecto: cuánto de la productividad temprana se explica por cómo se
       estimuló el pozo.
 
-      Solo entran pozos con al menos una fractura declarada. De las varias declaraciones que
-      puede tener un pozo se toma la última, que es la que describe cómo quedó terminado. Los
-      acumulados pueden venir nulos: un pozo fracturado hace tres meses todavía no tiene 12
-      meses de historia, y uno que todavía no declaró producción mayor a cero no tiene desde
-      cuándo contar.
+      Solo entran pozos con al menos una fractura declarada. Los acumulados pueden venir
+      nulos: un pozo fracturado hace tres meses todavía no tiene 12 meses de historia, y uno
+      que todavía no declaró producción mayor a cero no tiene desde cuándo contar.
+
+      **Qué fractura es "la" completación del pozo.** El Adjunto IV no trae una declaración
+      por pozo: un mismo trabajo puede venir partido en varias filas (59 pozos, hasta seis el
+      mismo día, algunas repetidas) y 129 pozos se volvieron a fracturar años después. Las
+      declaraciones que empiezan con menos de 45 días de diferencia se consolidan en un
+      trabajo (etapas y fluidos sumados, rama máxima, filas idénticas contadas una vez), y de
+      los trabajos del pozo se elige el último anterior a la primera producción, que es el que
+      explica los primeros meses. Si ninguno es anterior (pozos viejos que se re-fracturaron,
+      o una fractura declarada con fecha posterior al arranque), queda el primero y
+      `completacion_anterior_a_produccion` lo marca en falso: para esos pozos el diseño y la
+      producción temprana no se corresponden, y conviene excluirlos al comparar.
 
       Está a nivel pozo y no a nivel pozo-mes a propósito: una fila por unidad de observación
       es lo que se necesita para comparar un pozo con otro.
@@ -72,35 +81,46 @@ models:
           si el pozo todavía no produjo.
 
       - name: fecha_inicio_fractura
-        description: "Inicio de la última fractura declarada del pozo."
+        description: "Primer día del trabajo de completación elegido (la más temprana de sus declaraciones)."
         data_tests: [not_null]
 
       - name: tipo_terminacion
-        description: "Método de terminación de la última fractura."
+        description: "Método de terminación de la declaración con más etapas del trabajo."
 
       - name: longitud_rama_horizontal_m
         description: "Longitud de la rama horizontal, en metros. 0 en los pozos verticales."
 
       - name: cantidad_fracturas
-        description: "Etapas de fractura bombeadas en la última fractura. Es la medida de intensidad de la completación."
+        description: "Etapas de fractura del trabajo, sumando sus declaraciones. Es la medida de intensidad de la completación."
 
       - name: arena_bombeada_total_tn
-        description: "Agente de sostén total (nacional más importado), en toneladas."
+        description: "Agente de sostén total del trabajo (nacional más importado), en toneladas."
 
       - name: agua_inyectada_m3
-        description: "Agua bombeada en la última fractura, en m3."
+        description: "Agua bombeada en el trabajo, en m3."
 
       - name: co2_inyectado_m3
-        description: "CO2 inyectado en la última fractura, en m3."
+        description: "CO2 inyectado en el trabajo, en m3."
 
       - name: presion_maxima_psi
-        description: "Presión máxima de tratamiento, en psi."
+        description: "Presión máxima de tratamiento del trabajo, en psi."
 
       - name: potencia_equipos_fractura_hp
-        description: "Potencia hidráulica del set de bombeo, en HP."
+        description: "Potencia hidráulica máxima del set de bombeo en el trabajo, en HP."
 
       - name: duracion_dias
-        description: "Días que duró el tratamiento. Nula cuando la declaración trae el fin antes del inicio."
+        description: "Días del primer inicio al último fin del trabajo. Nula cuando alguna declaración trae el fin antes del inicio."
+
+      - name: declaraciones_de_fractura
+        description: "Cuántas filas del Adjunto IV se consolidaron en el trabajo. 1 en el 98 % de los pozos."
+        data_tests: [not_null]
+
+      - name: completacion_anterior_a_produccion
+        description: >
+          Verdadero si el trabajo elegido empezó antes de que termine el mes de la primera
+          producción (o si el pozo todavía no produjo). Falso en los pozos que ya producían
+          cuando se fracturaron por primera vez: ahí el diseño no explica los acumulados.
+        data_tests: [not_null]
 
       - name: prod_pet_3m
         description: "Petróleo acumulado en los primeros 3 meses desde la primera producción, en m3."
