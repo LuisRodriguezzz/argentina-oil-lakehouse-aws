@@ -46,7 +46,9 @@
   }
   .lectura { color: var(--tinta-2); max-width: 64ch; margin: 0 0 28px; }
   .panel { background: var(--panel); border-radius: 10px; padding: 40px; }
-  .principal { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 36px; align-items: stretch; }
+  .principal { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 36px; align-items: stretch; margin-bottom: 28px; }
+  .ancho { margin-top: 44px; }
+  .ancho .lienzo { overflow-x: auto; }
   .cifras { display: flex; flex-direction: column; justify-content: center; gap: 30px; }
   .valor { display: block; font-size: 42px; line-height: 1; letter-spacing: -.02em; }
   .etiqueta { display: block; font-size: 14px; color: var(--tinta-2); margin-top: 7px; max-width: 22ch; }
@@ -142,35 +144,52 @@
 
   <section>
     <p class="antetitulo">El diseño</p>
-    <h2>Ramas más largas y más etapas; menos petróleo por etapa</h2>
+    <h2>Ramas más largas y más etapas; el piso subió más que el techo</h2>
     <p class="lectura">$lectura_diseno</p>
     <div class="columnas">
       <figure>
-        <h3><span class="numero-figura">Gráfico 2</span>Rama horizontal y producción, pozo por pozo</h3>
-        <p class="subtitulo">Largo de la rama contra petróleo en los primeros 12 meses. Más
-        oscuro, más nuevo.</p>
+        <h3><span class="numero-figura">Gráfico 2</span>Distribución del petróleo a 12 meses, por cohorte</h3>
+        <p class="subtitulo">La línea va del percentil 10 al 90; la caja, del 25 al 75; la marca
+        blanca es la mediana.</p>
         <div id="grafico-2" class="lienzo"></div>
-        <figcaption>$pie_scatter</figcaption>
+        <figcaption>Cuando la caja sube entera, mejoró toda la generación y no solo los mejores
+        pozos; cuando se acorta, los pozos se parecen más entre sí.</figcaption>
         <p class="fuente">Fuente: Secretaría de Energía, DDJJ mensuales y Adjunto IV; <code>mart_pozo_completacion_produccion</code>.</p>
       </figure>
       <figure>
-        <h3><span class="numero-figura">Gráfico 3</span>Petróleo por etapa de fractura</h3>
-        <p class="subtitulo">Mediana de los primeros 12 meses dividida por la cantidad de
-        etapas, por cohorte.</p>
+        <h3><span class="numero-figura">Gráfico 3</span>Trayectoria del diseño</h3>
+        <p class="subtitulo">Una cohorte por punto, unidas en orden: rama horizontal contra
+        petróleo por metro. El tamaño es la cantidad de pozos.</p>
         <div id="grafico-3" class="lienzo"></div>
-        <figcaption>Si la producción por pozo sube solo porque se bombean más etapas, la
-        producción por etapa se queda quieta o baja: separa el tamaño del diseño de su
-        eficiencia.</figcaption>
+        <figcaption>Moverse a la derecha es perforar más largo; subir es sacar más por cada
+        metro. El play se movió sobre todo a la derecha.</figcaption>
         <p class="fuente">Fuente: Secretaría de Energía, DDJJ mensuales y Adjunto IV; <code>mart_pozo_completacion_produccion</code>.</p>
       </figure>
     </div>
+    <figure class="ancho">
+      <h3><span class="numero-figura">Gráfico 4</span>Mapa de diseño: petróleo por metro según rama y arena</h3>
+      <p class="subtitulo">Cada celda es una combinación de largo de rama y toneladas de arena por
+      metro; el color y el número son la mediana de petróleo por metro a 12 meses.</p>
+      <div id="grafico-4" class="lienzo"></div>
+      <figcaption>$lectura_mapa</figcaption>
+      <p class="fuente">Fuente: Secretaría de Energía, DDJJ mensuales y Adjunto IV; <code>mart_pozo_completacion_produccion</code>.</p>
+    </figure>
   </section>
 
   <section>
     <p class="antetitulo">Las operadoras</p>
     <h2>$titulo_operadoras</h2>
     <p class="lectura">$lectura_operadoras</p>
-    <h3><span class="numero-figura">Tabla 2</span>Operadoras, cohortes $primera_cohorte_operadoras en adelante</h3>
+    <figure>
+      <h3><span class="numero-figura">Gráfico 5</span>Curva tipo por operadora, contra el conjunto</h3>
+      <p class="subtitulo">Petróleo acumulado por pozo, mediana, cohortes $primera_cohorte_operadoras
+      en adelante. En gris, la misma curva para todos los pozos de esas cohortes.</p>
+      <div id="grafico-5" class="lienzo"></div>
+      <p class="fuente">Solo operadoras con $minimo pozos o más; cada curva llega hasta el mes al que ya
+      llegó al menos la mitad de sus pozos. Fuente: Secretaría de Energía, DDJJ mensuales;
+      <code>fact_produccion_mensual</code> y <code>dim_pozo</code>.</p>
+    </figure>
+    <h3 class="ancho"><span class="numero-figura">Tabla 2</span>Operadoras, cohortes $primera_cohorte_operadoras en adelante</h3>
     <p class="subtitulo">Medianas por operadora, ordenadas por petróleo por metro de rama en los primeros 12 meses.</p>
     <div class="tabla">$tabla_operadoras</div>
     <p class="fuente">Solo operadoras con $minimo pozos o más. "vs conjunto" compara con la mediana de
