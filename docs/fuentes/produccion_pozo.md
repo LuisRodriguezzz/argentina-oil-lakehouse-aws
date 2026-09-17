@@ -11,10 +11,10 @@ describe la familia elegida, **DDJJ abiertas y cerradas**, que es la que carga
 inyección presentada por la operadora. Es el lado "resultado" del que
 [`fractura.md`](fractura.md) describe "cómo se estimuló el pozo"; se cruzan por `idpozo`.
 
-Medido el 2026-09-06 sobre el CSV anual de 2024 descargado del portal, en el proyecto de
-origen (ADR 0006): **983.710 filas, 38 columnas, 82.379 pozos únicos, 59 empresas**. La tabla
-completa del lakehouse (2006-2026, todos los años con esta misma familia) tiene 18.234.202
-filas, medidas en `prod` el 2026-09-12 (ver README).
+Medido el 2026-09-06 sobre el CSV anual de 2024 descargado del portal: **983.710 filas, 38
+columnas, 82.379 pozos únicos, 59 empresas**. La tabla completa del lakehouse (2006-2026,
+todos los años con esta misma familia) tiene 18.234.202 filas, medidas en `prod` el 2026-09-12
+(ver README).
 
 ## Columnas
 
@@ -23,7 +23,7 @@ filas, medidas en `prod` el 2026-09-12 (ver README).
 | `idempresa` | string | Código interno de la empresa declarante |
 | `anio` | int | Año de la declaración jurada; columna de partición |
 | `mes` | int | Mes de la declaración jurada (1-12) |
-| `idpozo` | bigint | Identificador único del pozo. **Clave primaria** junto con `anio`/`mes`; cruza con `pozo_primera_produccion.idpozo` y `fractura.idpozo` |
+| `idpozo` | bigint | Identificador del pozo en el registro de la Secretaría. Identifica pozo × formación productiva: en `dim_pozo` hay 85.775 `idpozo` para 78.509 siglas, y 6.026 siglas con varios `idpozo` tienen varias formaciones. **Clave primaria** junto con `anio`/`mes`; cruza con `pozo_primera_produccion.idpozo` y `fractura.idpozo` |
 | `prod_pet` | double | Producción de petróleo del mes, en m³ |
 | `prod_gas` | double | Producción de gas del mes, en Mm³ (miles de m³) |
 | `prod_agua` | double | Producción de agua del mes, en m³ |
@@ -103,9 +103,9 @@ CKAN medido: 2026-08-04); la familia normal quedó congelada en 2026-03-03.
 
 ## Decisiones del contrato
 
-- Se elige la familia DDJJ abiertas y cerradas sobre la normal (pendiente 4 de semana 0,
-  resuelto); no se ingiere la columna `id`, exclusiva de la familia normal y redundante con
-  la clave.
+- Se elige la familia DDJJ abiertas y cerradas sobre la normal
+  ([comparación](comparacion-familias-produccion.md)); no se ingiere la columna `id`,
+  exclusiva de la familia normal y redundante con la clave.
 - `tef` acotado a `[0, 744]`: el valor negativo medido (-0,01) cae en cuarentena por el
   mínimo, no por el máximo.
 - `prod_*` e `iny_*` con `min: 0`.

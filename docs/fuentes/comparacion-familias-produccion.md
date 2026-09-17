@@ -1,6 +1,6 @@
 # Comparación: familia "normal" vs "DDJJ abiertas y cerradas" (producción de pozos 2024)
 
-Pendiente 4 de [`docs/semana-0-derisking.md`](../semana-0-derisking.md). El dataset CKAN
+El portal publica cada año de producción dos veces, y había que elegir una. El dataset CKAN
 `produccion-de-petroleo-y-gas-por-pozo` publica cada año en dos recursos con el mismo
 contenido aparente pero nombres distintos: "Producción de Pozos de Gas y Petróleo - 2024"
 (familia **normal**) y "... - 2024 (DDJJ abiertas y cerradas)" (familia **DDJJ**). Se

@@ -1,6 +1,9 @@
-# Semana 0 — De-risking (2026-09-05)
+# Bitácora de la semana 0: de-risking (2026-09-05)
 
-Pruebas ejecutadas contra las fuentes reales antes de escribir infraestructura. Todo lo de abajo se midió, no se leyó. Las fichas por fuente en [`docs/fuentes/`](fuentes/) continúan estas mediciones sobre las tablas ya cargadas.
+Documento histórico. Son las pruebas ejecutadas contra las fuentes reales antes de escribir una
+línea de infraestructura, tal como se anotaron ese día: todo lo de abajo se midió, no se leyó.
+Las fichas por fuente en [`docs/fuentes/`](fuentes/) repiten y extienden estas mediciones sobre
+las tablas ya cargadas, y son la referencia vigente si algún número difiere.
 
 ## Portal datos.energia.gob.ar
 
@@ -22,7 +25,7 @@ Pruebas ejecutadas contra las fuentes reales antes de escribir infraestructura. 
 | Lectura con Polars | 0,6 s |
 
 - Esquema: las columnas numéricas llegan con decimales ("0.000"), así que hay que forzar Float64; la inferencia automática falla.
-- `tef` va de 0 a 720 con mediana 0: son horas efectivas de producción en el mes (720 = 30 días × 24 h). Un valor negativo (-0,01) confirma que necesita test de rango.
+- `tef` va de -0,01 a 720 con mediana 0: son horas efectivas de producción en el mes (720 = 30 días × 24 h). El valor negativo confirma que necesita test de rango.
 - `vida_util` es 0 en todas las filas de 2024: columna vacía en este año; no usar como feature sin verificar otros años.
 - YPF 2024 por tipo de recurso: no convencional tiene 26.148 filas pero 12,7 millones de m³ de petróleo; convencional tiene 445.609 filas y 7,4 millones. Vaca Muerta concentra el volumen en pocos pozos.
 - Cuencas de YPF por filas: Golfo San Jorge 253.043, Neuquina 172.659, Cuyana 37.367, Austral 8.676.

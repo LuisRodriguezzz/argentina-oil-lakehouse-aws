@@ -1,6 +1,6 @@
 # ADR 0006 — Alcance: solo AWS, y qué queda afuera
 
-**Estado:** aceptada · 2026-09-11
+**Estado:** aceptada · 2026-09-11 · reescrita el 2026-09-17
 
 ## Contexto
 
@@ -40,18 +40,16 @@ que es lo que distingue un pipeline que funciona en una máquina de uno que se p
   esté o no en uso— y montarlo aparte sería el único servicio prendido de todo el proyecto.
 - **Monitoreo.** Una ejecución fallida queda en el historial de Step Functions y en los logs
   del job; nada avisa. Unos modelos de dbt que lean la metadata de Iceberg y el historial de
-  calidad de silver (`dq_runs`) son trabajo pendiente, no algo que se pueda copiar de otro lado.
+  calidad de silver (`dq_runs`) son trabajo pendiente.
 - **Airflow.** Step Functions cumple el mismo rol —dependencias entre tareas, reintentos, una
   ejecución por corrida— sin un servicio prendido: un entorno de MWAA es el recurso más caro
   que este proyecto podría tener (ADR 0001).
 
 ## Consecuencias
 
-- Los números que cita el README se midieron en `prod` de este repo: la carga completa el
-  2026-09-12 y gold el 2026-09-16. El README lo dice en "Resultados medidos".
+- Todo el presupuesto, de tiempo y de dólares, va al camino de datos y a su despliegue. Nada
+  queda prendido entre corridas.
+- Lo que quedó afuera está listado en el README, en "Qué no hace", como límite y no como
+  pendiente de redacción.
 - El nombre del proyecto habla del dominio, los datos públicos del upstream argentino, y no de
   una compañía. YPF aparece en los datos como la operadora que más declara, y nada más.
-- Los tres pasos que hacen real el despliegue —aplicar dev y prod, mover el state de Terraform a
-  S3 con la tabla de locks de `infra/terraform/bootstrap/`, y habilitar `deploy.yml` con los
-  roles de OIDC— están hechos y documentados en el ADR 0005 y en el runbook de
-  `infra/terraform/README.md`.
