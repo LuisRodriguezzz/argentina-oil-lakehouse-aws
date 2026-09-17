@@ -59,7 +59,8 @@ order by cohorte, mes
 """
 
 # El mart de pozos no tiene `tipopozo`: se cruza con el tramo vigente de dim_pozo para quedarse
-# con los petrolíferos, igual que hace mart_curva_tipo.
+# con los petrolíferos, igual que hace mart_curva_tipo. Quedan afuera los pozos cuya
+# completación es posterior a su primera producción: ahí el diseño no explica los acumulados.
 SQL_POZOS = """
 select
     m.sigla,
@@ -81,6 +82,7 @@ where lower(m.formacion) = 'vaca muerta'
   and m.prod_pet_12m is not null
   and m.longitud_rama_horizontal_m > 0
   and m.cantidad_fracturas is not null
+  and m.completacion_anterior_a_produccion
 """
 
 # La curva tipo por operadora se arma igual que mart_curva_tipo pero agrupando por empresa,
