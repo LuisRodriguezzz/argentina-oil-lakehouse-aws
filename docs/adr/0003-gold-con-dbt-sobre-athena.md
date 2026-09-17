@@ -73,9 +73,11 @@ lugares del mismo modelo. Una definición por operación, y los modelos se leen 
   `athena-results/`, que es donde dbt-athena los pondría por defecto y donde la regla de ciclo
   de vida del bucket los borraría a los siete días.
 - El job de gold instala unos cincuenta paquetes en cada corrida (dbt y el wheel con sus
-  dependencias). Medido en `prod` el 2026-09-12: 4 minutos de job para los 8 modelos y sus
-  tests, todos en verde. Buena parte es arranque del clúster e instalación, no `dbt build`. Es
-  el precio de no mantener una imagen propia.
+  dependencias). Medido en `prod`: 4 minutos de job para 8 modelos y 82 tests el 2026-09-12, y
+  7 minutos para 9 modelos y 91 tests el 2026-09-16, todos en verde. Buena parte es arranque
+  del clúster e instalación, no `dbt build`; y el arranque depende de cuánto tarde Glue en
+  conseguir capacidad, que ese mismo día llegó a 8 minutos en una corrida. Es el precio de no
+  mantener una imagen propia.
 - Un modelo nuevo no necesita `terraform apply`: el proyecto de dbt viaja en el wheel, así que
   alcanza con volver a correr `scripts/aws_deploy.ps1`.
 - `dbt docs` no se genera. El catálogo y el manifiesto quedarían en el disco efímero del job de
