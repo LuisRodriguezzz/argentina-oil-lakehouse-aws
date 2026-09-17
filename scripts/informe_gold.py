@@ -1,4 +1,4 @@
-"""Genera docs/hallazgos.html: la página con los gráficos de gold, lista para publicar.
+"""Genera docs/hallazgos.html: el informe con los gráficos de gold, listo para publicar.
 
 Consulta gold en Athena con boto3 (credenciales y región del perfil de `~/.aws`) y escribe un
 HTML autocontenido: los datos viajan adentro de la página como JSON y los gráficos los dibuja
@@ -24,16 +24,19 @@ from string import Template
 
 import boto3
 
-# La población de los cuatro gráficos es una sola, así nunca se contradicen entre sí: pozos
-# de petróleo shale de Vaca Muerta con primera producción entre 2016 y 2025. Antes de 2016 los
-# pozos eran pilotos de otra escala (3.500 m3 a 12 meses contra 17.000 en 2016) y aplastan
-# los ejes sin contar nada nuevo.
+# La población de todo el informe es una sola, así los gráficos no se contradicen entre sí:
+# pozos de petróleo shale de Vaca Muerta con primera producción entre 2016 y 2025. Antes de
+# 2016 los pozos eran pilotos de otra escala (3.500 m3 a 12 meses contra 17.000 en 2016) y
+# aplastan los ejes sin contar nada nuevo.
 COHORTES = list(range(2016, 2026))
 MINIMO_POZOS = 20
 PRIMERA_COHORTE_OPERADORAS = 2019
 # Por encima de esto un pozo queda fuera del dibujo del scatter (no de las medianas): dos o
 # tres declaraciones de 120.000-180.000 m3 aplastan a los otros 1.400 contra el eje.
 TOPE_SCATTER_M3 = 100_000
+# Dos etiquetas al final de las líneas de la curva se pisan si sus valores están más cerca
+# que esto (unos 17 px con el alto del gráfico).
+SEPARACION_ETIQUETAS_M3 = 3_500
 
 SQL_CORTE = "select max(anio * 100 + mes) as ultimo_mes from {gold}.fact_produccion_mensual"
 
@@ -77,25 +80,29 @@ where lower(m.formacion) = 'vaca muerta'
 """
 
 # Paleta: un solo azul para las series únicas y su rampa, de claro a oscuro, para la cohorte,
-# que es una variable ordenada (más oscuro = más nueva). El resto es tinta y grises.
+# que es una variable ordenada (más oscuro = más nueva). El resto es tinta y grises; el verde
+# y el rojo solo aparecen en las variaciones porcentuales.
 AZUL = "#2a78d6"
 RAMPA_AZUL = [
     "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6",
     "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b",
 ]  # fmt: skip
-TINTA = "#0b0b0b"
-TINTA_SECUNDARIA = "#52514e"
-TINTA_TENUE = "#898781"
-GRILLA = "#e1e0d9"
-EJE = "#c3c2b7"
-SUPERFICIE = "#fcfcfb"
-PLANO = "#f9f9f7"
-FUENTE = 'system-ui, -apple-system, "Segoe UI", sans-serif'
+TINTA = "#141412"
+TINTA_SECUNDARIA = "#4f4e4a"
+TINTA_TENUE = "#8a8883"
+GRILLA = "#e6e5e0"
+EJE = "#c9c8c2"
+PLANO = "#fbfbfa"
+PANEL = "#f1f1ee"
+TARJETA = "#ffffff"
+SUBE = "#0f6e33"
+BAJA = "#b42318"
+FUENTE = '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif'
 
 # Configuración común de Vega-Lite: marcas finas, grilla recesiva, texto en tinta y no en el
-# color de la serie.
+# color de la serie, sin leyendas (la tabla de cohortes hace de leyenda).
 CONFIGURACION = {
-    "background": SUPERFICIE,
+    "background": "transparent",
     "font": FUENTE,
     "view": {"stroke": None},
     "axis": {
@@ -110,17 +117,16 @@ CONFIGURACION = {
         "titlePadding": 10,
     },
     "axisX": {"grid": False},
-    "legend": {
-        "labelColor": TINTA_SECUNDARIA,
-        "titleColor": TINTA_SECUNDARIA,
-        "titleFontWeight": "normal",
-        "labelFontSize": 12,
-    },
     "line": {"strokeWidth": 2, "strokeCap": "round", "strokeJoin": "round"},
     "bar": {"cornerRadiusEnd": 4},
     "text": {"color": TINTA_SECUNDARIA, "fontSize": 11},
 }
-ESCALA_COHORTE = {"domain": COHORTES, "range": RAMPA_AZUL}
+COLOR_COHORTE = {
+    "field": "cohorte",
+    "type": "ordinal",
+    "scale": {"domain": COHORTES, "range": RAMPA_AZUL},
+    "legend": None,
+}
 
 
 def consultar(athena, sql: str, workgroup: str, database: str) -> list[dict]:
@@ -135,9 +141,8 @@ def consultar(athena, sql: str, workgroup: str, database: str) -> list[dict]:
     )
     id_consulta = inicio["QueryExecutionId"]
     while True:
-        estado = athena.get_query_execution(QueryExecutionId=id_consulta)["QueryExecution"][
-            "Status"
-        ]
+        ejecucion = athena.get_query_execution(QueryExecutionId=id_consulta)["QueryExecution"]
+        estado = ejecucion["Status"]
         if estado["State"] == "SUCCEEDED":
             break
         if estado["State"] in ("FAILED", "CANCELLED"):
@@ -146,7 +151,8 @@ def consultar(athena, sql: str, workgroup: str, database: str) -> list[dict]:
 
     filas: list[dict] = []
     columnas: list[tuple[str, str]] = []
-    for pagina in athena.get_paginator("get_query_results").paginate(QueryExecutionId=id_consulta):
+    paginas = athena.get_paginator("get_query_results").paginate(QueryExecutionId=id_consulta)
+    for pagina in paginas:
         if not columnas:
             columnas = [
                 (c["Name"], c["Type"])
@@ -172,6 +178,32 @@ def convertir(valor: str | None, tipo: str) -> int | float | str | None:
     return valor
 
 
+# --- Cálculos sobre los datos -------------------------------------------------------------
+
+
+def recortar_cola(curva: list[dict]) -> list[dict]:
+    """Corta cada cohorte donde ya no llegó al menos la mitad de sus pozos.
+
+    Una cohorte joven tiene meses altos a los que solo llegaron los pozos que arrancaron en
+    enero: la muestra se achica de a decenas y la mediana salta. El mínimo de 20 pozos no
+    alcanza contra ese sesgo de selección; la mitad de la cohorte sí.
+    """
+    en_mes_cero = {fila["cohorte"]: fila["pozos"] for fila in curva if fila["mes"] == 0}
+    return [fila for fila in curva if fila["pozos"] * 2 >= en_mes_cero[fila["cohorte"]]]
+
+
+def en_mes(curva: list[dict], mes: int, campo: str) -> dict[int, float]:
+    """Un valor de la curva por cohorte, en un mes dado: `{cohorte: valor}`."""
+    return {fila["cohorte"]: fila[campo] for fila in curva if fila["mes"] == mes}
+
+
+def variacion(actual: float | None, anterior: float | None) -> float | None:
+    """Variación porcentual; nula cuando falta alguno de los dos términos."""
+    if actual is None or not anterior:
+        return None
+    return (actual / anterior - 1) * 100
+
+
 def por_cohorte(pozos: list[dict]) -> list[dict]:
     """Medianas de diseño y producción por cohorte, exactas, sobre la misma lista de pozos."""
     grupos: dict[int, list[dict]] = defaultdict(list)
@@ -191,49 +223,115 @@ def por_cohorte(pozos: list[dict]) -> list[dict]:
     ]
 
 
-def por_operadora(pozos: list[dict]) -> list[dict]:
-    """Productividad por metro por operadora, en las cohortes recientes y con muestra mínima.
+def tabla_de_cohortes(curva: list[dict], cohortes: list[dict]) -> list[dict]:
+    """Una fila por cohorte con acumulados, diseño y la variación contra la cohorte anterior.
+
+    Los acumulados y el tamaño salen de la curva (toda la cohorte con producción); el diseño,
+    de los pozos con fractura declarada. Son dos poblaciones y la nota al pie lo dice.
+    """
+    tamanio = en_mes(curva, 0, "pozos")
+    a_12 = en_mes(curva, 11, "mediana_m3")
+    a_36 = en_mes(curva, 35, "mediana_m3")
+    disenio = {fila["cohorte"]: fila for fila in cohortes}
+    filas: list[dict] = []
+    anterior: dict = {}
+    for cohorte in COHORTES:
+        d = disenio.get(cohorte, {})
+        fila = {
+            "cohorte": cohorte,
+            "pozos": tamanio.get(cohorte),
+            "rama_m": d.get("mediana_rama_m"),
+            "etapas": d.get("mediana_etapas"),
+            "acum_12": a_12.get(cohorte),
+            "acum_36": a_36.get(cohorte),
+            "m3_por_etapa": d.get("mediana_m3_por_etapa"),
+        }
+        fila["var_12"] = variacion(fila["acum_12"], anterior.get("acum_12"))
+        fila["var_36"] = variacion(fila["acum_36"], anterior.get("acum_36"))
+        fila["var_etapa"] = variacion(fila["m3_por_etapa"], anterior.get("m3_por_etapa"))
+        filas.append(fila)
+        anterior = fila
+    return filas
+
+
+def por_operadora(pozos: list[dict]) -> tuple[list[dict], float]:
+    """Productividad por metro por operadora en las cohortes recientes, y la del conjunto.
 
     Por metro de rama y no por pozo: así una operadora con ramas más largas no gana solo por
-    perforar más largo. Desde 2019 para comparar diseños de la misma época.
+    perforar más largo. Desde 2019 para comparar diseños de la misma época. La mediana del
+    conjunto es la de todos los pozos de esas cohortes, de todas las operadoras.
     """
+    recientes = [pozo for pozo in pozos if pozo["cohorte"] >= PRIMERA_COHORTE_OPERADORAS]
+    conjunto = median(pozo["m3_por_metro"] for pozo in recientes)
     grupos: dict[str, list[dict]] = defaultdict(list)
-    for pozo in pozos:
-        if pozo["cohorte"] >= PRIMERA_COHORTE_OPERADORAS:
-            grupos[pozo["empresa"]].append(pozo)
-    filas = [
-        {
-            "empresa": empresa,
-            "pozos": len(grupo),
-            "mediana_m3_por_metro": median(p["m3_por_metro"] for p in grupo),
-            "mediana_prod_12m": median(p["prod_12m"] for p in grupo),
-        }
-        for empresa, grupo in grupos.items()
-        if len(grupo) >= MINIMO_POZOS
-    ]
-    return sorted(filas, key=lambda fila: -fila["mediana_m3_por_metro"])
+    for pozo in recientes:
+        grupos[pozo["empresa"]].append(pozo)
+    filas = []
+    for empresa, grupo in grupos.items():
+        if len(grupo) < MINIMO_POZOS:
+            continue
+        m3_por_metro = median(p["m3_por_metro"] for p in grupo)
+        filas.append(
+            {
+                "empresa": empresa,
+                "pozos": len(grupo),
+                "m3_por_metro": m3_por_metro,
+                "vs_conjunto": variacion(m3_por_metro, conjunto),
+                "prod_12m": median(p["prod_12m"] for p in grupo),
+                "rama_m": median(p["rama_m"] for p in grupo),
+            }
+        )
+    return sorted(filas, key=lambda fila: -fila["m3_por_metro"]), conjunto
 
 
-def recortar_cola(curva: list[dict]) -> list[dict]:
-    """Corta cada cohorte donde ya no llegó al menos la mitad de sus pozos.
+def etiquetas_finales(curva: list[dict]) -> list[dict]:
+    """El año de cada cohorte al final de su línea, salteando los que se pisarían.
 
-    Una cohorte joven tiene meses altos a los que solo llegaron los pozos que arrancaron en
-    enero: la muestra se achica de a decenas y la mediana salta. El mínimo de 20 pozos no
-    alcanza contra ese sesgo de selección; la mitad de la cohorte sí.
+    Reemplaza a la leyenda: se lee la línea y al lado su año. Cuando dos líneas terminan en el
+    mismo mes y casi al mismo valor, se etiqueta una sola; la tabla de abajo trae todas.
     """
-    en_mes_cero = {fila["cohorte"]: fila["pozos"] for fila in curva if fila["mes"] == 0}
-    return [fila for fila in curva if fila["pozos"] * 2 >= en_mes_cero[fila["cohorte"]]]
+    ultimos = {}
+    for fila in curva:
+        ultimos[fila["cohorte"]] = fila
+    puestas: list[dict] = []
+    for fila in sorted(ultimos.values(), key=lambda f: (-f["mes"], -f["mediana_m3"])):
+        vecinas = [p for p in puestas if p["mes"] == fila["mes"]]
+        if all(
+            abs(p["mediana_m3"] - fila["mediana_m3"]) >= SEPARACION_ETIQUETAS_M3 for p in vecinas
+        ):
+            puestas.append(fila)
+    return puestas
 
 
-def mediana_en_mes(curva: list[dict], mes: int) -> dict | None:
-    """La cohorte más nueva que ya llegó a ese mes con muestra suficiente, y su mediana."""
-    filas = [fila for fila in curva if fila["mes"] == mes]
-    return max(filas, key=lambda fila: fila["cohorte"]) if filas else None
+# --- Gráficos (especificaciones de Vega-Lite) -----------------------------------------------
+
+
+def capas_de_etiquetas(etiquetas: list[dict], y: dict) -> list[dict]:
+    """El año al final de cada línea. Las líneas que llegan al borde derecho se etiquetan a su
+    derecha, donde no hay nada; las que terminan antes, arriba del último punto y con un halo
+    blanco (el mismo texto, grueso y del color del fondo, dibujado debajo) para que se lea
+    sobre las líneas que pasan por ahí."""
+    al_borde = [e for e in etiquetas if e["mes"] == 35]
+    en_el_medio = [e for e in etiquetas if e["mes"] < 35]
+    texto = {"type": "text", "fontSize": 12, "fontWeight": 500}
+    halo = {**texto, "stroke": TARJETA, "strokeWidth": 5, "opacity": 0.9}
+    return [
+        {
+            "data": {"values": datos},
+            "mark": {**marca, **posicion},
+            "encoding": {"y": y, "text": {"field": "cohorte"}},
+        }
+        for datos, posicion in (
+            (al_borde, {"align": "left", "dx": 7}),
+            (en_el_medio, {"align": "center", "dy": -11}),
+        )
+        for marca in (halo, texto)
+    ]
 
 
 def grafico_curva_tipo(curva: list[dict]) -> dict:
-    """Una línea por cohorte; al pasar el puntero, una regla vertical con todas las cohortes
-    de ese mes (el pivot arma una columna por cohorte para el tooltip)."""
+    """Una línea por cohorte con su año al final; al pasar el puntero, una regla vertical con
+    todas las cohortes de ese mes (el pivot arma una columna por cohorte para el tooltip)."""
     seleccion = {
         "name": "mes_elegido",
         "select": {
@@ -244,12 +342,9 @@ def grafico_curva_tipo(curva: list[dict]) -> dict:
             "clear": "pointerout",
         },
     }
-    color = {
-        "field": "cohorte",
-        "type": "ordinal",
-        "title": "Cohorte",
-        "scale": ESCALA_COHORTE,
-        "legend": {"symbolType": "stroke"},
+    visible_al_pasar = {
+        "condition": {"param": "mes_elegido", "empty": False, "value": 1},
+        "value": 0,
     }
     y = {
         "field": "mediana_m3",
@@ -259,7 +354,8 @@ def grafico_curva_tipo(curva: list[dict]) -> dict:
     }
     return {
         "width": "container",
-        "height": 380,
+        "height": 400,
+        "padding": {"right": 34},
         "data": {"values": curva},
         "encoding": {
             "x": {
@@ -271,27 +367,18 @@ def grafico_curva_tipo(curva: list[dict]) -> dict:
             }
         },
         "layer": [
-            {"mark": "line", "encoding": {"y": y, "color": color}},
+            {"mark": "line", "encoding": {"y": y, "color": COLOR_COHORTE}},
+            *capas_de_etiquetas(etiquetas_finales(curva), y),
             {
                 "mark": {"type": "point", "filled": True, "size": 60},
-                "encoding": {
-                    "y": y,
-                    "color": color,
-                    "opacity": {
-                        "condition": {"param": "mes_elegido", "empty": False, "value": 1},
-                        "value": 0,
-                    },
-                },
+                "encoding": {"y": y, "color": COLOR_COHORTE, "opacity": visible_al_pasar},
             },
             {
                 "transform": [{"pivot": "cohorte", "value": "mediana_m3", "groupby": ["mes"]}],
                 "mark": {"type": "rule", "color": EJE},
                 "params": [seleccion],
                 "encoding": {
-                    "opacity": {
-                        "condition": {"param": "mes_elegido", "empty": False, "value": 1},
-                        "value": 0,
-                    },
+                    "opacity": visible_al_pasar,
                     "tooltip": [{"field": "mes", "title": "Mes"}]
                     + [
                         {
@@ -311,16 +398,16 @@ def grafico_curva_tipo(curva: list[dict]) -> dict:
 def grafico_rama_vs_produccion(pozos: list[dict]) -> dict:
     return {
         "width": "container",
-        "height": 400,
+        "height": 340,
         "data": {"values": pozos},
         "transform": [{"filter": f"datum.prod_12m <= {TOPE_SCATTER_M3}"}],
-        "mark": {"type": "circle", "size": 44, "opacity": 0.6},
+        "mark": {"type": "circle", "size": 40, "opacity": 0.6},
         "encoding": {
             "x": {
                 "field": "rama_m",
                 "type": "quantitative",
                 "title": "Rama horizontal (m)",
-                "axis": {"format": ",.0f"},
+                "axis": {"format": ",.0f", "tickCount": 5},
             },
             "y": {
                 "field": "prod_12m",
@@ -329,12 +416,7 @@ def grafico_rama_vs_produccion(pozos: list[dict]) -> dict:
                 "scale": {"domain": [0, TOPE_SCATTER_M3]},
                 "axis": {"format": ",.0f"},
             },
-            "color": {
-                "field": "cohorte",
-                "type": "ordinal",
-                "title": "Cohorte",
-                "scale": ESCALA_COHORTE,
-            },
+            "color": COLOR_COHORTE,
             "tooltip": [
                 {"field": "sigla", "title": "Pozo"},
                 {"field": "empresa", "title": "Operadora"},
@@ -350,13 +432,13 @@ def grafico_rama_vs_produccion(pozos: list[dict]) -> dict:
 def grafico_por_etapa(cohortes: list[dict]) -> dict:
     return {
         "width": "container",
-        "height": 320,
+        "height": 340,
         "data": {"values": cohortes},
         "encoding": {
             "x": {
                 "field": "cohorte",
                 "type": "ordinal",
-                "title": "Cohorte (año de primera producción)",
+                "title": "Cohorte",
                 "axis": {"labelAngle": 0},
             },
             "y": {
@@ -368,7 +450,7 @@ def grafico_por_etapa(cohortes: list[dict]) -> dict:
         },
         "layer": [
             {
-                "mark": {"type": "bar", "width": 24, "color": AZUL},
+                "mark": {"type": "bar", "width": 22, "color": AZUL},
                 "encoding": {
                     "tooltip": [
                         {"field": "cohorte", "title": "Cohorte"},
@@ -380,11 +462,6 @@ def grafico_por_etapa(cohortes: list[dict]) -> dict:
                         },
                         {"field": "mediana_etapas", "title": "Etapas, mediana", "format": ",.0f"},
                         {"field": "mediana_rama_m", "title": "Rama (m), mediana", "format": ",.0f"},
-                        {
-                            "field": "mediana_prod_12m",
-                            "title": "Petróleo 12 m (m3)",
-                            "format": ",.0f",
-                        },
                     ]
                 },
             },
@@ -396,200 +473,160 @@ def grafico_por_etapa(cohortes: list[dict]) -> dict:
     }
 
 
-def grafico_operadoras(operadoras: list[dict]) -> dict:
-    return {
-        "width": "container",
-        "height": {"step": 30},
-        "data": {"values": operadoras},
-        "encoding": {
-            "y": {
-                "field": "empresa",
-                "type": "nominal",
-                "sort": "-x",
-                "title": None,
-                "axis": {"labelLimit": 280, "labelColor": TINTA_SECUNDARIA},
-            },
-            "x": {
-                "field": "mediana_m3_por_metro",
-                "type": "quantitative",
-                "title": "Petróleo por metro de rama a 12 meses, mediana (m3/m)",
-                "axis": {"format": ",.0f", "tickCount": 6},
-            },
-        },
-        "layer": [
-            {
-                "mark": {"type": "bar", "height": 18, "color": AZUL},
-                "encoding": {
-                    "tooltip": [
-                        {"field": "empresa", "title": "Operadora"},
-                        {"field": "pozos", "title": "Pozos"},
-                        {
-                            "field": "mediana_m3_por_metro",
-                            "title": "m3 por metro",
-                            "format": ",.1f",
-                        },
-                        {
-                            "field": "mediana_prod_12m",
-                            "title": "Petróleo 12 m (m3)",
-                            "format": ",.0f",
-                        },
-                    ]
-                },
-            },
-            {
-                "mark": {"type": "text", "align": "left", "dx": 6},
-                "encoding": {"text": {"field": "mediana_m3_por_metro", "format": ",.1f"}},
-            },
-        ],
-    }
+# --- HTML ----------------------------------------------------------------------------------
 
 
-def formatear(valor: object) -> str:
-    """Números a la argentina: punto de miles, coma decimal. Lo demás, como texto."""
-    if isinstance(valor, float) and not valor.is_integer():
-        return f"{valor:,.1f}".replace(",", "@").replace(".", ",").replace("@", ".")
-    if isinstance(valor, (int, float)):
-        return f"{int(valor):,}".replace(",", ".")
-    return html.escape(str(valor))
+def numero(valor: float | None, decimales: int = 0) -> str:
+    """Números a la argentina: punto de miles, coma decimal. Un guion cuando no hay dato."""
+    if valor is None:
+        return "—"
+    texto = f"{valor:,.{decimales}f}"
+    return texto.replace(",", "@").replace(".", ",").replace("@", ".")
 
 
-def tabla(filas: list[dict], columnas: dict[str, str]) -> str:
-    """La tabla es la versión accesible de cada gráfico: los mismos números, sin color."""
-    encabezado = "".join(f"<th>{titulo}</th>" for titulo in columnas.values())
-    cuerpo = "".join(
-        "<tr>" + "".join(f"<td>{formatear(fila[campo])}</td>" for campo in columnas) + "</tr>"
-        for fila in filas
-    )
-    return f"<table><thead><tr>{encabezado}</tr></thead><tbody>{cuerpo}</tbody></table>"
+def delta(pct: float | None, sufijo: str = "") -> str:
+    """Variación porcentual con flecha; verde si sube, rojo si baja, gris si no hay dato."""
+    if pct is None:
+        return '<span class="delta neutra">—</span>'
+    clase, flecha, signo = ("sube", "▲", "+") if pct >= 0 else ("baja", "▼", "−")
+    return f'<span class="delta {clase}">{flecha} {signo}{numero(abs(pct), 1)} %{sufijo}</span>'
 
 
-def seccion(numero: int, titulo: str, subtitulo: str, lectura: str, datos: str) -> str:
-    return f"""
-    <figure class="grafico">
-      <h2>{titulo}</h2>
-      <p class="subtitulo">{subtitulo}</p>
-      <div id="grafico-{numero}" class="lienzo"></div>
-      <figcaption>{lectura}</figcaption>
-      <details><summary>Ver los datos</summary>{datos}</details>
-    </figure>"""
+def swatch(cohorte: int) -> str:
+    color = RAMPA_AZUL[COHORTES.index(cohorte)]
+    return f'<i class="swatch" style="background:{color}"></i>{cohorte}'
 
 
-def cifra(valor: str, etiqueta: str) -> str:
+def cifra(valor: str, etiqueta: str, variacion_html: str = "") -> str:
     return (
         f'<div class="cifra"><span class="valor">{valor}</span>'
-        f'<span class="etiqueta">{etiqueta}</span></div>'
+        f'<span class="etiqueta">{etiqueta}</span>{variacion_html}</div>'
     )
 
 
-# La plantilla vive al lado, en informe_gold.html: es HTML y CSS, se lee y se retoca mejor
-# en su propio archivo. Los `$nombre` los llena `pagina()`.
-PLANTILLA = Template(Path(__file__).with_suffix(".html").read_text(encoding="utf-8"))
+def tabla(encabezados: list[str], filas: list[list[str]], izquierda: tuple[int, ...] = (0,)) -> str:
+    """Las celdas llegan ya como HTML (los nombres de empresa, escapados). Los números van a
+    la derecha; `izquierda` dice qué columnas son texto."""
+
+    def celda(etiqueta: str, indice: int, contenido: str) -> str:
+        clase = ' class="izquierda"' if indice in izquierda else ""
+        return f"<{etiqueta}{clase}>{contenido}</{etiqueta}>"
+
+    cabeza = "".join(celda("th", i, titulo) for i, titulo in enumerate(encabezados))
+    cuerpo = "".join(
+        "<tr>" + "".join(celda("td", i, c) for i, c in enumerate(fila)) + "</tr>" for fila in filas
+    )
+    return f"<table><thead><tr>{cabeza}</tr></thead><tbody>{cuerpo}</tbody></table>"
+
+
+def html_tabla_cohortes(filas: list[dict]) -> str:
+    encabezados = [
+        "Cohorte", "Pozos", "Rama (m)", "Etapas",
+        "12 meses (m3)", "Δ", "36 meses (m3)", "Δ", "m3 por etapa", "Δ",
+    ]  # fmt: skip
+    cuerpo = [
+        [
+            swatch(f["cohorte"]),
+            numero(f["pozos"]),
+            numero(f["rama_m"]),
+            numero(f["etapas"]),
+            numero(f["acum_12"]),
+            delta(f["var_12"]),
+            numero(f["acum_36"]),
+            delta(f["var_36"]),
+            numero(f["m3_por_etapa"]),
+            delta(f["var_etapa"]),
+        ]
+        for f in filas
+    ]
+    return tabla(encabezados, cuerpo)
+
+
+def html_tabla_operadoras(filas: list[dict]) -> str:
+    encabezados = [
+        "", "Operadora", "Pozos", "m3 por metro", "vs conjunto", "Petróleo 12 m (m3)", "Rama (m)",
+    ]  # fmt: skip
+    tope = max(f["m3_por_metro"] for f in filas)
+    cuerpo = [
+        [
+            f'<span class="orden">{orden}</span>',
+            html.escape(f["empresa"]),
+            numero(f["pozos"]),
+            f'<span class="barra-caja"><i class="barra" '
+            f'style="width:{f["m3_por_metro"] / tope * 100:.0f}%"></i></span>'
+            f"{numero(f['m3_por_metro'], 1)}",
+            delta(f["vs_conjunto"]),
+            numero(f["prod_12m"]),
+            numero(f["rama_m"]),
+        ]
+        for orden, f in enumerate(filas, start=1)
+    ]
+    return tabla(encabezados, cuerpo, izquierda=(0, 1, 3))
 
 
 def pagina(corte: str, curva: list[dict], pozos: list[dict], base: str) -> str:
     curva = recortar_cola(curva)
     cohortes = por_cohorte(pozos)
-    operadoras = por_operadora(pozos)
+    ledger = tabla_de_cohortes(curva, cohortes)
+    operadoras, conjunto = por_operadora(pozos)
+    primera, ultima = ledger[0], ledger[-1]
+    con_12 = [f for f in ledger if f["acum_12"] is not None]
+    con_36 = [f for f in ledger if f["acum_36"] is not None]
+    ultima_12, ultima_36 = con_12[-1], con_36[-1]
+    desde_2021 = [f["acum_12"] for f in con_12 if f["cohorte"] >= 2021]
     fuera_de_escala = sum(1 for pozo in pozos if pozo["prod_12m"] > TOPE_SCATTER_M3)
-    a_12 = mediana_en_mes(curva, 11)
-    a_36 = mediana_en_mes(curva, 35)
 
     cifras = [
-        cifra(formatear(len(pozos)), "pozos con fractura y 12 meses de producción"),
         cifra(
-            formatear(a_12["mediana_m3"]) + " m3",
-            f"petróleo a 12 meses, mediana de la cohorte {a_12['cohorte']}",
+            f"{numero(ultima_12['acum_12'])} m3",
+            f"a 12 meses, mediana de la cohorte {ultima_12['cohorte']}",
+            delta(ultima_12["var_12"], f" vs {ultima_12['cohorte'] - 1}"),
         ),
         cifra(
-            formatear(a_36["mediana_m3"]) + " m3",
-            f"petróleo a 36 meses, mediana de la cohorte {a_36['cohorte']}",
+            f"{numero(ultima_36['acum_36'])} m3",
+            f"a 36 meses, mediana de la cohorte {ultima_36['cohorte']}",
+            delta(ultima_36["var_36"], f" vs {ultima_36['cohorte'] - 1}"),
         ),
         cifra(
-            formatear(len(operadoras)),
-            f"operadoras con {MINIMO_POZOS} pozos o más desde {PRIMERA_COHORTE_OPERADORAS}",
+            f"×{numero(ultima_12['acum_12'] / con_12[0]['acum_12'], 1)}",
+            f"a 12 meses, de la cohorte {con_12[0]['cohorte']} a la {ultima_12['cohorte']}",
         ),
     ]
 
-    secciones = [
-        seccion(
-            1,
-            "Curva tipo por cohorte",
-            "Petróleo acumulado por pozo, mediana de cada cohorte, mes a mes desde la primera "
-            "producción.",
-            f"Cada línea es una generación de pozos; el color va del más claro ({COHORTES[0]}) al "
-            f"más oscuro ({COHORTES[-1]}). Cada línea llega hasta el mes al que ya llegó al menos "
-            "la mitad de su cohorte; más allá, la mediana solo hablaría de los pozos que "
-            "arrancaron temprano. La distancia entre líneas es la mejora de diseño entre "
-            "generaciones; cuando dejan de separarse, el diseño maduró.",
-            tabla(
-                curva,
-                {
-                    "cohorte": "Cohorte",
-                    "mes": "Mes",
-                    "pozos": "Pozos",
-                    "mediana_m3": "Mediana (m3)",
-                },
-            ),
-        ),
-        seccion(
-            2,
-            "Rama horizontal y producción, pozo por pozo",
-            "Cada punto es un pozo: largo de la rama horizontal contra petróleo en sus primeros "
-            "12 meses.",
-            "Más rama, más petróleo, pero con mucha dispersión: a igual largo hay pozos que "
-            "producen el doble que otros. Los pozos nuevos (más oscuros) están a la derecha y "
-            "arriba: ramas más largas y más producción. Por eso el gráfico siguiente normaliza "
-            f"por etapa. {fuera_de_escala} pozos por encima de {formatear(TOPE_SCATTER_M3)} m3 "
-            "quedan fuera del dibujo, no de las medianas.",
-            tabla(
-                cohortes,
-                {
-                    "cohorte": "Cohorte",
-                    "pozos": "Pozos",
-                    "mediana_rama_m": "Rama (m)",
-                    "mediana_etapas": "Etapas",
-                    "mediana_prod_12m": "Petróleo 12 m (m3)",
-                },
-            ),
-        ),
-        seccion(
-            3,
-            "Petróleo por etapa de fractura, por cohorte",
-            "Mediana de los primeros 12 meses dividida por la cantidad de etapas, en cada cohorte.",
-            "Si la producción por pozo sube solo porque se bombean más etapas, la producción por "
-            "etapa se queda quieta o baja. Este gráfico separa el tamaño del diseño de su "
-            "eficiencia. Al pasar el puntero se ven las medianas de etapas y de rama de cada "
-            "cohorte.",
-            tabla(
-                cohortes,
-                {
-                    "cohorte": "Cohorte",
-                    "pozos": "Pozos",
-                    "mediana_m3_por_etapa": "m3 por etapa",
-                    "mediana_m3_por_metro": "m3 por metro",
-                    "mediana_etapas": "Etapas",
-                },
-            ),
-        ),
-        seccion(
-            4,
-            "Operadoras: petróleo por metro de rama",
-            f"Mediana por operadora, cohortes {PRIMERA_COHORTE_OPERADORAS} en adelante, "
-            f"solo con {MINIMO_POZOS} pozos o más.",
-            "Por metro y no por pozo: así una operadora no gana solo por perforar más largo. Es "
-            "una comparación de resultados, no de calidad técnica: cada operadora trabaja en "
-            "bloques distintos de la formación, y el bloque pesa tanto como el diseño.",
-            tabla(
-                operadoras,
-                {
-                    "empresa": "Operadora",
-                    "pozos": "Pozos",
-                    "mediana_m3_por_metro": "m3 por metro",
-                    "mediana_prod_12m": "Petróleo 12 m (m3)",
-                },
-            ),
-        ),
-    ]
+    lectura_curva = (
+        f"A los 12 meses, la mediana pasó de {numero(con_12[0]['acum_12'])} m3 en la cohorte "
+        f"{con_12[0]['cohorte']} a {numero(ultima_12['acum_12'])} en la {ultima_12['cohorte']}. "
+        f"Desde 2021 las cohortes se mueven entre {numero(min(desde_2021))} y "
+        f"{numero(max(desde_2021))} m3: la mejora entre generaciones se frenó. Cada línea es "
+        f"una cohorte, del azul más claro ({COHORTES[0]}) al más oscuro ({COHORTES[-1]}), y "
+        "llega hasta el mes al que ya llegó al menos la mitad de sus pozos."
+    )
+    lectura_diseno = (
+        f"Entre las cohortes {primera['cohorte']} y {ultima['cohorte']}, la rama mediana pasó "
+        f"de {numero(primera['rama_m'])} a {numero(ultima['rama_m'])} m "
+        f"({delta(variacion(ultima['rama_m'], primera['rama_m']))}) y las etapas de "
+        f"{numero(primera['etapas'])} a {numero(ultima['etapas'])} "
+        f"({delta(variacion(ultima['etapas'], primera['etapas']))}). El petróleo por etapa fue "
+        f"de {numero(primera['m3_por_etapa'])} a {numero(ultima['m3_por_etapa'])} m3 "
+        f"({delta(variacion(ultima['m3_por_etapa'], primera['m3_por_etapa']))}): los pozos "
+        "producen más porque son más grandes, no porque cada etapa rinda más."
+    )
+    pie_scatter = (
+        "Más rama, más petróleo, con mucha dispersión: a igual largo hay pozos que producen el "
+        f"doble que otros. {fuera_de_escala} pozos por encima de {numero(TOPE_SCATTER_M3)} m3 "
+        "quedan fuera del dibujo, no de las medianas."
+    )
+    mejor, peor = operadoras[0], operadoras[-1]
+    titulo_operadoras = (
+        f"Por metro perforado, {numero(mejor['m3_por_metro'] / peor['m3_por_metro'], 1)} veces "
+        "de diferencia entre la primera y la última"
+    )
+    lectura_operadoras = (
+        f"La mediana del conjunto es {numero(conjunto, 1)} m3 de petróleo por metro de rama en "
+        "los primeros 12 meses. Es una comparación de resultados, no de calidad técnica: cada "
+        "operadora trabaja en bloques distintos de la formación, y el bloque pesa tanto como el "
+        "diseño."
+    )
 
     especificaciones = [
         {
@@ -601,7 +638,6 @@ def pagina(corte: str, curva: list[dict], pozos: list[dict], base: str) -> str:
             grafico_curva_tipo(curva),
             grafico_rama_vs_produccion(pozos),
             grafico_por_etapa(cohortes),
-            grafico_operadoras(operadoras),
         )
     ]
     # `</` cerraría el <script> si apareciera en un nombre; se rompe la secuencia por las dudas.
@@ -609,34 +645,48 @@ def pagina(corte: str, curva: list[dict], pozos: list[dict], base: str) -> str:
 
     return PLANTILLA.substitute(
         descripcion=(
-            "Curvas tipo por cohorte, rama contra producción, petróleo por etapa y ranking de "
-            "operadoras en Vaca Muerta, desde las declaraciones juradas de la Secretaría de "
+            "Diez cohortes de pozos de petróleo shale de Vaca Muerta: curva tipo, diseño de "
+            "completación y operadoras, desde las declaraciones juradas de la Secretaría de "
             "Energía."
         ),
         plano=PLANO,
-        superficie=SUPERFICIE,
+        panel=PANEL,
+        tarjeta=TARJETA,
         tinta=TINTA,
         tinta_2=TINTA_SECUNDARIA,
         tenue=TINTA_TENUE,
         grilla=GRILLA,
         azul=AZUL,
+        sube=SUBE,
+        baja=BAJA,
         fuente=FUENTE,
         primera_cohorte=COHORTES[0],
         ultima_cohorte=COHORTES[-1],
+        primera_cohorte_operadoras=PRIMERA_COHORTE_OPERADORAS,
+        minimo=MINIMO_POZOS,
         corte=corte,
         fecha=date.today().isoformat(),
         base=base,
+        pozos=numero(len(pozos)),
         cifras="".join(cifras),
-        secciones="".join(secciones),
-        pozos=formatear(len(pozos)),
-        minimo=MINIMO_POZOS,
-        primera_cohorte_operadoras=PRIMERA_COHORTE_OPERADORAS,
+        lectura_curva=lectura_curva,
+        tabla_cohortes=html_tabla_cohortes(ledger),
+        lectura_diseno=lectura_diseno,
+        pie_scatter=pie_scatter,
+        titulo_operadoras=titulo_operadoras,
+        lectura_operadoras=lectura_operadoras,
+        tabla_operadoras=html_tabla_operadoras(operadoras),
         especificaciones=datos_json,
     )
 
 
+# La plantilla vive al lado, en informe_gold.html: es HTML y CSS, se lee y se retoca mejor
+# en su propio archivo. Los `$nombre` los llena `pagina()`.
+PLANTILLA = Template(Path(__file__).with_suffix(".html").read_text(encoding="utf-8"))
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Genera la página de hallazgos desde gold")
+    parser = argparse.ArgumentParser(description="Genera el informe de hallazgos desde gold")
     # Prod por defecto y no dev: dev tiene un solo año de producción y las curvas salen vacías.
     parser.add_argument("--suffix", default=os.environ.get("GLUE_DATABASE_SUFFIX", "_prod"))
     parser.add_argument("--salida", default="docs/hallazgos.html", type=Path)

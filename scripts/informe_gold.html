@@ -3,66 +3,162 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vaca Muerta: completación y producción</title>
+<title>Vaca Muerta, generación por generación</title>
 <meta name="description" content="$descripcion">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
 <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
 <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 <style>
   :root {
-    --plano: $plano; --superficie: $superficie; --tinta: $tinta; --tinta-2: $tinta_2;
-    --tenue: $tenue; --linea: $grilla; --azul: $azul;
+    --plano: $plano; --panel: $panel; --tarjeta: $tarjeta;
+    --tinta: $tinta; --tinta-2: $tinta_2; --tenue: $tenue; --linea: $grilla;
+    --azul: $azul; --sube: $sube; --baja: $baja;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--plano); color: var(--tinta);
     font-family: $fuente; font-size: 16px; line-height: 1.55;
   }
-  main { max-width: 1040px; margin: 0 auto; padding: 48px 16px 64px; }
-  header { margin-bottom: 40px; }
-  .antetitulo { color: var(--tenue); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 8px; }
-  h1 { font-size: 34px; line-height: 1.15; font-weight: 600; margin: 0 0 14px; letter-spacing: -.01em; }
-  header p { max-width: 720px; color: var(--tinta-2); margin: 0 0 6px; }
-  .meta { color: var(--tenue); font-size: 13px; }
-  .cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 28px 0 40px; }
-  .cifra { background: var(--superficie); border: 1px solid var(--linea); border-radius: 8px; padding: 18px 20px; }
-  .valor { display: block; font-size: 32px; font-weight: 600; letter-spacing: -.01em; }
-  .etiqueta { display: block; color: var(--tinta-2); font-size: 14px; margin-top: 4px; }
-  .grafico { margin: 0 0 32px; background: var(--superficie); border: 1px solid var(--linea); border-radius: 8px; padding: 24px 24px 16px; }
-  h2 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
-  .subtitulo { color: var(--tinta-2); margin: 0 0 18px; font-size: 15px; }
+  main { max-width: 1120px; margin: 0 auto; padding: 56px 24px 80px; }
+  a { color: var(--tinta-2); text-underline-offset: 3px; }
+  code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .92em; }
+
+  .antetitulo {
+    font-size: 12px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--tenue); margin: 0 0 14px;
+  }
+  h1, h2, .bajada, .valor { font-family: "Newsreader", Georgia, "Times New Roman", serif; }
+  h1 {
+    font-size: 58px; font-weight: 500; line-height: 1; letter-spacing: -.022em;
+    margin: 0 0 22px; max-width: 20ch;
+  }
+  .bajada { font-size: 23px; line-height: 1.32; color: var(--tinta-2); max-width: 32em; margin: 0 0 18px; }
+  .meta { font-size: 13px; color: var(--tenue); margin: 0; }
+
+  section { margin-top: 80px; }
+  h2 {
+    font-size: 34px; font-weight: 500; line-height: 1.12; letter-spacing: -.012em;
+    margin: 0 0 14px; max-width: 30ch;
+  }
+  .lectura { color: var(--tinta-2); max-width: 64ch; margin: 0 0 28px; }
+  .panel { background: var(--panel); border-radius: 22px; padding: 40px; }
+  .principal { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 36px; align-items: stretch; }
+  .cifras { display: flex; flex-direction: column; justify-content: center; gap: 30px; }
+  .valor { display: block; font-size: 42px; line-height: 1; letter-spacing: -.02em; }
+  .etiqueta { display: block; font-size: 14px; color: var(--tinta-2); margin-top: 7px; max-width: 22ch; }
+  .delta { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .delta.sube { color: var(--sube); }
+  .delta.baja { color: var(--baja); }
+  .delta.neutra { color: var(--tenue); }
+  .cifra .delta { display: block; margin-top: 7px; }
+  .tarjeta { background: var(--tarjeta); border-radius: 14px; padding: 22px 22px 14px; }
+  .tarjeta + .tarjeta { margin-top: 20px; }
   .lienzo { width: 100%; }
-  figcaption { color: var(--tinta-2); font-size: 14px; margin-top: 14px; max-width: 760px; }
-  details { margin-top: 12px; font-size: 13px; }
-  summary { cursor: pointer; color: var(--tenue); }
-  table { border-collapse: collapse; margin-top: 10px; width: 100%; font-variant-numeric: tabular-nums; }
-  th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--linea); }
-  th:first-child, td:first-child { text-align: left; }
-  th { color: var(--tinta-2); font-weight: 500; }
-  footer { color: var(--tinta-2); font-size: 14px; border-top: 1px solid var(--linea); padding-top: 24px; margin-top: 48px; }
-  footer h2 { font-size: 16px; }
-  footer ul { padding-left: 20px; }
-  footer li { margin-bottom: 6px; }
-  a { color: var(--tinta); }
-  @media (max-width: 600px) { h1 { font-size: 28px; } .valor { font-size: 26px; } .grafico { padding: 16px 12px 12px; } }
+  .columnas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px; }
+  figure { margin: 0; }
+  figure h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .subtitulo { font-size: 14px; color: var(--tinta-2); margin: 0 0 14px; }
+  figcaption { font-size: 13px; color: var(--tenue); margin-top: 10px; max-width: 60ch; }
+
+  .tabla { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th {
+    font-size: 12px; font-weight: 500; color: var(--tenue); text-align: right; letter-spacing: .02em;
+    padding: 0 12px 10px; border-bottom: 1px solid var(--linea); white-space: nowrap;
+  }
+  td { text-align: right; padding: 10px 12px; border-bottom: 1px solid var(--linea); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  th:first-child, td:first-child { text-align: left; padding-left: 0; }
+  th:last-child, td:last-child { padding-right: 0; }
+  td.izquierda, th.izquierda { text-align: left; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 10px; }
+  .barra-caja { display: inline-block; width: 170px; margin-right: 10px; vertical-align: 1px; }
+  .barra { display: block; height: 8px; background: var(--azul); border-radius: 2px; }
+  .orden { color: var(--tenue); width: 2ch; }
+  .nota { font-size: 13px; color: var(--tenue); margin: 12px 0 0; max-width: 72ch; }
+
+  footer { margin-top: 88px; padding-top: 28px; border-top: 1px solid var(--linea); color: var(--tinta-2); font-size: 14px; max-width: 72ch; }
+  footer h2 { font-size: 24px; }
+  footer ul { padding-left: 18px; margin: 0; }
+  footer li { margin-bottom: 8px; }
+
+  @media (max-width: 900px) {
+    main { padding: 36px 16px 56px; }
+    h1 { font-size: 40px; }
+    h2 { font-size: 28px; }
+    .bajada { font-size: 19px; }
+    .panel { padding: 24px 18px; border-radius: 16px; }
+    .principal, .columnas { grid-template-columns: 1fr; gap: 24px; }
+    .cifras { flex-direction: row; flex-wrap: wrap; gap: 20px 36px; }
+    .valor { font-size: 34px; }
+    .barra-caja { width: 110px; }
+  }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <p class="antetitulo">Argentina Oil Lakehouse · capa gold</p>
-    <h1>Vaca Muerta: cómo se completan los pozos y cuánto producen</h1>
-    <p>Lo que dicen las declaraciones juradas mensuales de la Secretaría de Energía y los
-    partes de fractura del Adjunto IV sobre los pozos de petróleo shale: pozos petrolíferos
-    con primera producción entre $primera_cohorte y $ultima_cohorte, comparados por cohorte,
-    por diseño y por operadora.</p>
-    <p class="meta">Declaraciones hasta $corte · generado el $fecha desde <code>$base</code> ·
+    <p class="antetitulo">Argentina Oil Lakehouse · Informe · Declaraciones hasta $corte</p>
+    <h1>Vaca Muerta, generación por generación</h1>
+    <p class="bajada">Diez cohortes de pozos de petróleo shale medidas con la misma regla: qué
+    produjeron en sus primeros 12 y 36 meses, con qué diseño se completaron y quién saca más
+    por metro perforado.</p>
+    <p class="meta">Pozos petrolíferos con primera producción entre $primera_cohorte y
+    $ultima_cohorte · $pozos con fractura declarada y doce meses de producción · generado el
+    $fecha desde <code>$base</code> ·
     <a href="https://github.com/LuisRodriguezzz/argentina-oil-lakehouse-aws">código y modelo de datos</a></p>
   </header>
 
-  <section class="cifras">$cifras</section>
+  <section class="panel">
+    <p class="antetitulo">La curva tipo</p>
+    <h2>Diez generaciones de pozos, mes a mes</h2>
+    <p class="lectura">$lectura_curva</p>
+    <div class="principal">
+      <aside class="cifras">$cifras</aside>
+      <div class="tarjeta"><div id="grafico-1" class="lienzo"></div></div>
+    </div>
+    <div class="tarjeta tabla">$tabla_cohortes</div>
+    <p class="nota">Pozos y acumulados: toda la cohorte con producción declarada (los pozos del
+    mes 0). Rama, etapas y petróleo por etapa: los que además tienen fractura declarada y doce
+    meses completos. Cada Δ compara con la cohorte anterior.</p>
+  </section>
 
-  $secciones
+  <section>
+    <p class="antetitulo">El diseño</p>
+    <h2>Ramas más largas y más etapas; menos petróleo por etapa</h2>
+    <p class="lectura">$lectura_diseno</p>
+    <div class="columnas">
+      <figure>
+        <h3>Rama horizontal y producción, pozo por pozo</h3>
+        <p class="subtitulo">Largo de la rama contra petróleo en los primeros 12 meses. Más
+        oscuro, más nuevo.</p>
+        <div id="grafico-2" class="lienzo"></div>
+        <figcaption>$pie_scatter</figcaption>
+      </figure>
+      <figure>
+        <h3>Petróleo por etapa de fractura</h3>
+        <p class="subtitulo">Mediana de los primeros 12 meses dividida por la cantidad de
+        etapas, por cohorte.</p>
+        <div id="grafico-3" class="lienzo"></div>
+        <figcaption>Si la producción por pozo sube solo porque se bombean más etapas, la
+        producción por etapa se queda quieta o baja: separa el tamaño del diseño de su
+        eficiencia.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <p class="antetitulo">Las operadoras</p>
+    <h2>$titulo_operadoras</h2>
+    <p class="lectura">$lectura_operadoras</p>
+    <div class="tabla">$tabla_operadoras</div>
+    <p class="nota">Cohortes $primera_cohorte_operadoras en adelante, para comparar diseños de la
+    misma época; solo operadoras con $minimo pozos o más. "vs conjunto" compara con la mediana de
+    todos los pozos de esas cohortes, de todas las operadoras.</p>
+  </section>
 
   <footer>
     <h2>Cómo se calculó</h2>
@@ -71,17 +167,18 @@
       gas mayor a cero. La cohorte es el año de ese mes. El padrón oficial no sirve para esto:
       publica el mes solo para el año en curso.</li>
       <li><strong>Población</strong>: formación Vaca Muerta, subtipo SHALE, pozos petrolíferos según
-      su última declaración, cohortes $primera_cohorte a $ultima_cohorte. Para los gráficos por
-      pozo, además, doce meses completos declarados y rama horizontal mayor a cero:
-      $pozos pozos con al menos una fractura declarada.</li>
+      su última declaración, cohortes $primera_cohorte a $ultima_cohorte. Para el diseño y las
+      operadoras, además, doce meses completos declarados, rama horizontal mayor a cero y al menos
+      una fractura declarada en el Adjunto IV: $pozos pozos.</li>
       <li><strong>Medianas</strong>, no promedios: unos pocos pozos excepcionales tiran el promedio
       hacia arriba. En la curva tipo la mediana es aproximada (Athena, <code>approx_percentile</code>);
       en el resto es exacta.</li>
-      <li><strong>Muestra mínima</strong>: $minimo pozos por punto de la curva y por operadora; las
-      operadoras se comparan desde la cohorte $primera_cohorte_operadoras para que los diseños sean
-      de la misma época.</li>
+      <li><strong>Colas de la curva</strong>: cada línea llega hasta el mes al que ya llegó al menos
+      la mitad de su cohorte y nunca con menos de $minimo pozos. Más allá, la mediana solo hablaría de
+      los pozos que arrancaron en enero.</li>
       <li>Tablas de origen: <code>mart_curva_tipo</code> y <code>mart_pozo_completacion_produccion</code>,
-      construidas con dbt sobre Athena a partir de bronze y silver en Iceberg.</li>
+      construidas con dbt sobre Athena a partir de bronze y silver en Iceberg. Datos: Secretaría de
+      Energía de la Nación, declaraciones juradas mensuales y Adjunto IV de fracturas.</li>
     </ul>
   </footer>
 </main>
