@@ -94,7 +94,9 @@ aws stepfunctions start-execution --state-machine-arn $arn --input '{}'
 
 ## Resultados medidos
 
-Medido en `prod` el 2026-09-12, cargando los 21 años desde cero.
+Medido en `prod`: la carga completa de los 21 años el 2026-09-12; gold, sus tests y los
+hallazgos, el 2026-09-16, después de recalcular la primera producción de cada pozo desde las
+declaraciones ([ficha del padrón](docs/fuentes/pozo_primera_produccion.md)).
 
 | Qué | Valor |
 | --- | ---: |
@@ -103,7 +105,7 @@ Medido en `prod` el 2026-09-12, cargando los 21 años desde cero.
 | Recursos que fallaron un check duro | 0 |
 | Tramos de vigencia en `dim_pozo` (SCD tipo 2) | 611.677 |
 | Pozos en el mart, con completación y producción cruzadas | 4.635 |
-| Tests de dbt en verde, dentro del job de gold | 82 |
+| Tests de dbt en verde, dentro del job de gold | 91 |
 | Tests de Python en verde, en el CI | 140 |
 | Costo de la reconstrucción completa | < 2 USD |
 
@@ -113,14 +115,21 @@ Medido en `prod` el 2026-09-12, cargando los 21 años desde cero.
 | Bronze de producción | Spark, 4 workers | 7 min |
 | Silver de producción + padrón | Spark, 4 workers | 19 + 2 min |
 | Fractura y reservas, máquinas completas | | 6 y 5 min |
-| Gold (8 modelos, 82 tests sobre Athena) | Glue 5.0, 2 workers | 4 min |
+| Gold (9 modelos, 91 tests sobre Athena) | Glue 5.0, 2 workers | 7 min |
 
 Casi todo el tiempo es la descarga del portal. Gold cuesta unos 0,15 USD por corrida.
 
-Dos hallazgos sobre el dato, no sobre la infraestructura:
+Tres hallazgos sobre el dato, no sobre la infraestructura:
 
-- El acumulado de petróleo a 12 meses crece 7 veces entre los pozos no convencionales de menos
-  de 20 etapas de fractura y los de más de 40, en la cuenca Neuquina.
+- En los pozos no convencionales de la cuenca Neuquina, la mediana del petróleo acumulado en
+  los primeros 12 meses es 13 veces mayor con más de 40 etapas de fractura (32.800 m3, 1.267
+  pozos) que con menos de 20 (2.500 m3, 1.335 pozos). Con la media da 7 veces: entre los pozos
+  de pocas etapas hay unos pocos muy buenos que la levantan.
+- La curva tipo de Vaca Muerta shale (`mart_curva_tipo`, pozos petrolíferos, mediana del
+  acumulado por cohorte de primera producción) cuenta la historia del play: 3.500 m3 a los 12
+  meses en las cohortes 2013-2015, 17.000 en 2016, 33.000 en 2019, y desde 2021 una meseta en
+  37.000-39.000 m3 durante cinco cohortes seguidas. El diseño de completación maduró y la mejora
+  por pozo se frenó.
 - La ingesta usa la familia "DDJJ abiertas y cerradas" y no la normal. Comparado un año
   completo: 0 diferencias en producción, inyección y estado, +159 declaraciones rectificadas, y
   es la única que la Secretaría sigue actualizando
