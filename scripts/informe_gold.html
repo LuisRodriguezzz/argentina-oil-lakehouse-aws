@@ -37,6 +37,7 @@
   }
   .bajada { font-size: 23px; line-height: 1.32; color: var(--tinta-2); max-width: 32em; margin: 0 0 18px; }
   .meta { font-size: 13px; color: var(--tenue); margin: 0; }
+  header { padding-bottom: 28px; border-bottom: 1px solid var(--linea); }
 
   section { margin-top: 80px; }
   h2 {
@@ -44,7 +45,7 @@
     margin: 0 0 14px; max-width: 30ch;
   }
   .lectura { color: var(--tinta-2); max-width: 64ch; margin: 0 0 28px; }
-  .panel { background: var(--panel); border-radius: 22px; padding: 40px; }
+  .panel { background: var(--panel); border-radius: 10px; padding: 40px; }
   .principal { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 36px; align-items: stretch; }
   .cifras { display: flex; flex-direction: column; justify-content: center; gap: 30px; }
   .valor { display: block; font-size: 42px; line-height: 1; letter-spacing: -.02em; }
@@ -54,14 +55,17 @@
   .delta.baja { color: var(--baja); }
   .delta.neutra { color: var(--tenue); }
   .cifra .delta { display: block; margin-top: 7px; }
-  .tarjeta { background: var(--tarjeta); border-radius: 14px; padding: 22px 22px 14px; }
-  .tarjeta + .tarjeta { margin-top: 20px; }
+  .tarjeta { background: var(--tarjeta); border-radius: 6px; padding: 22px 22px 16px; }
+  .tarjeta + .tarjeta { margin-top: 28px; }
+  .numero-figura { color: var(--tenue); font-weight: 500; margin-right: 10px; }
+  .fuente { font-size: 12px; color: var(--tenue); margin: 12px 0 0; }
   .lienzo { width: 100%; }
-  .columnas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px; }
+  .columnas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 36px; row-gap: 0; }
+  .columnas figure { display: grid; grid-template-rows: subgrid; grid-row: span 5; }
   figure { margin: 0; }
-  figure h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
   .subtitulo { font-size: 14px; color: var(--tinta-2); margin: 0 0 14px; }
-  figcaption { font-size: 13px; color: var(--tenue); margin-top: 10px; max-width: 60ch; }
+  figcaption { font-size: 13px; color: var(--tinta-2); margin-top: 10px; max-width: 60ch; }
 
   .tabla { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -87,10 +91,11 @@
 
   @media (max-width: 900px) {
     main { padding: 36px 16px 56px; }
+    .columnas figure { display: block; }
     h1 { font-size: 40px; }
     h2 { font-size: 28px; }
     .bajada { font-size: 19px; }
-    .panel { padding: 24px 18px; border-radius: 16px; }
+    .panel { padding: 24px 18px; border-radius: 8px; }
     .principal, .columnas { grid-template-columns: 1fr; gap: 24px; }
     .cifras { flex-direction: row; flex-wrap: wrap; gap: 20px 36px; }
     .valor { font-size: 34px; }
@@ -118,12 +123,21 @@
     <p class="lectura">$lectura_curva</p>
     <div class="principal">
       <aside class="cifras">$cifras</aside>
-      <div class="tarjeta"><div id="grafico-1" class="lienzo"></div></div>
+      <div class="tarjeta">
+        <h3><span class="numero-figura">Gráfico 1</span>Petróleo acumulado por pozo, mediana de cada cohorte</h3>
+        <p class="subtitulo">Cada línea llega hasta el mes al que ya llegó al menos la mitad de su cohorte.</p>
+        <div id="grafico-1" class="lienzo"></div>
+        <p class="fuente">Fuente: Secretaría de Energía, declaraciones juradas mensuales hasta $corte; <code>mart_curva_tipo</code>.</p>
+      </div>
     </div>
-    <div class="tarjeta tabla">$tabla_cohortes</div>
-    <p class="nota">Pozos y acumulados: toda la cohorte con producción declarada (los pozos del
-    mes 0). Rama, etapas y petróleo por etapa: los que además tienen fractura declarada y doce
-    meses completos. Cada Δ compara con la cohorte anterior.</p>
+    <div class="tarjeta">
+      <h3><span class="numero-figura">Tabla 1</span>Cohortes $primera_cohorte a $ultima_cohorte</h3>
+      <p class="subtitulo">Medianas por cohorte. Cada Δ compara con la cohorte anterior.</p>
+      <div class="tabla">$tabla_cohortes</div>
+      <p class="fuente">Pozos y acumulados: toda la cohorte con producción declarada (los pozos del
+      mes 0). Rama, etapas y petróleo por etapa: los que además tienen fractura declarada y doce
+      meses completos. Fuente: Secretaría de Energía, DDJJ mensuales y Adjunto IV.</p>
+    </div>
   </section>
 
   <section>
@@ -132,20 +146,22 @@
     <p class="lectura">$lectura_diseno</p>
     <div class="columnas">
       <figure>
-        <h3>Rama horizontal y producción, pozo por pozo</h3>
+        <h3><span class="numero-figura">Gráfico 2</span>Rama horizontal y producción, pozo por pozo</h3>
         <p class="subtitulo">Largo de la rama contra petróleo en los primeros 12 meses. Más
         oscuro, más nuevo.</p>
         <div id="grafico-2" class="lienzo"></div>
         <figcaption>$pie_scatter</figcaption>
+        <p class="fuente">Fuente: Secretaría de Energía, DDJJ mensuales y Adjunto IV; <code>mart_pozo_completacion_produccion</code>.</p>
       </figure>
       <figure>
-        <h3>Petróleo por etapa de fractura</h3>
+        <h3><span class="numero-figura">Gráfico 3</span>Petróleo por etapa de fractura</h3>
         <p class="subtitulo">Mediana de los primeros 12 meses dividida por la cantidad de
         etapas, por cohorte.</p>
         <div id="grafico-3" class="lienzo"></div>
         <figcaption>Si la producción por pozo sube solo porque se bombean más etapas, la
         producción por etapa se queda quieta o baja: separa el tamaño del diseño de su
         eficiencia.</figcaption>
+        <p class="fuente">Fuente: Secretaría de Energía, DDJJ mensuales y Adjunto IV; <code>mart_pozo_completacion_produccion</code>.</p>
       </figure>
     </div>
   </section>
@@ -154,10 +170,12 @@
     <p class="antetitulo">Las operadoras</p>
     <h2>$titulo_operadoras</h2>
     <p class="lectura">$lectura_operadoras</p>
+    <h3><span class="numero-figura">Tabla 2</span>Operadoras, cohortes $primera_cohorte_operadoras en adelante</h3>
+    <p class="subtitulo">Medianas por operadora, ordenadas por petróleo por metro de rama en los primeros 12 meses.</p>
     <div class="tabla">$tabla_operadoras</div>
-    <p class="nota">Cohortes $primera_cohorte_operadoras en adelante, para comparar diseños de la
-    misma época; solo operadoras con $minimo pozos o más. "vs conjunto" compara con la mediana de
-    todos los pozos de esas cohortes, de todas las operadoras.</p>
+    <p class="fuente">Solo operadoras con $minimo pozos o más. "vs conjunto" compara con la mediana de
+    todos los pozos de esas cohortes, de todas las operadoras. Fuente: Secretaría de Energía, DDJJ
+    mensuales y Adjunto IV.</p>
   </section>
 
   <footer>

@@ -82,7 +82,7 @@ where lower(m.formacion) = 'vaca muerta'
 # Paleta: un solo azul para las series únicas y su rampa, de claro a oscuro, para la cohorte,
 # que es una variable ordenada (más oscuro = más nueva). El resto es tinta y grises; el verde
 # y el rojo solo aparecen en las variaciones porcentuales.
-AZUL = "#2a78d6"
+AZUL = "#1c5cab"
 RAMPA_AZUL = [
     "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6",
     "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b",
@@ -284,49 +284,36 @@ def por_operadora(pozos: list[dict]) -> tuple[list[dict], float]:
     return sorted(filas, key=lambda fila: -fila["m3_por_metro"]), conjunto
 
 
-def etiquetas_finales(curva: list[dict]) -> list[dict]:
-    """El año de cada cohorte al final de su línea, salteando los que se pisarían.
-
-    Reemplaza a la leyenda: se lee la línea y al lado su año. Cuando dos líneas terminan en el
-    mismo mes y casi al mismo valor, se etiqueta una sola; la tabla de abajo trae todas.
-    """
-    ultimos = {}
+def ultimos_puntos(curva: list[dict]) -> list[dict]:
+    """El último punto de cada cohorte, con el año como texto para la etiqueta."""
+    ultimos: dict[int, dict] = {}
     for fila in curva:
         ultimos[fila["cohorte"]] = fila
+    return sorted(ultimos.values(), key=lambda f: (-f["mes"], -f["mediana_m3"]))
+
+
+def etiquetas_al_borde(curva: list[dict]) -> list[dict]:
+    """El año de cada cohorte a la derecha de su línea, solo para las que llegan al borde
+    derecho, donde no hay otras líneas encima; y salteando las que se pisarían entre sí. Las
+    que terminan antes llevan un punto final y el texto dice en qué mes; la tabla de abajo
+    trae todas."""
     puestas: list[dict] = []
-    for fila in sorted(ultimos.values(), key=lambda f: (-f["mes"], -f["mediana_m3"])):
-        vecinas = [p for p in puestas if p["mes"] == fila["mes"]]
+    for fila in ultimos_puntos(curva):
+        if fila["mes"] != 35:
+            continue
         if all(
-            abs(p["mediana_m3"] - fila["mediana_m3"]) >= SEPARACION_ETIQUETAS_M3 for p in vecinas
+            abs(p["mediana_m3"] - fila["mediana_m3"]) >= SEPARACION_ETIQUETAS_M3 for p in puestas
         ):
             puestas.append(fila)
     return puestas
 
 
+def terminan_antes(curva: list[dict]) -> list[dict]:
+    """Las cohortes cuya línea no llega al mes 35 todavía, con su último mes."""
+    return [fila for fila in ultimos_puntos(curva) if fila["mes"] < 35]
+
+
 # --- Gráficos (especificaciones de Vega-Lite) -----------------------------------------------
-
-
-def capas_de_etiquetas(etiquetas: list[dict], y: dict) -> list[dict]:
-    """El año al final de cada línea. Las líneas que llegan al borde derecho se etiquetan a su
-    derecha, donde no hay nada; las que terminan antes, arriba del último punto y con un halo
-    blanco (el mismo texto, grueso y del color del fondo, dibujado debajo) para que se lea
-    sobre las líneas que pasan por ahí."""
-    al_borde = [e for e in etiquetas if e["mes"] == 35]
-    en_el_medio = [e for e in etiquetas if e["mes"] < 35]
-    texto = {"type": "text", "fontSize": 12, "fontWeight": 500}
-    halo = {**texto, "stroke": TARJETA, "strokeWidth": 5, "opacity": 0.9}
-    return [
-        {
-            "data": {"values": datos},
-            "mark": {**marca, **posicion},
-            "encoding": {"y": y, "text": {"field": "cohorte"}},
-        }
-        for datos, posicion in (
-            (al_borde, {"align": "left", "dx": 7}),
-            (en_el_medio, {"align": "center", "dy": -11}),
-        )
-        for marca in (halo, texto)
-    ]
 
 
 def grafico_curva_tipo(curva: list[dict]) -> dict:
@@ -368,7 +355,16 @@ def grafico_curva_tipo(curva: list[dict]) -> dict:
         },
         "layer": [
             {"mark": "line", "encoding": {"y": y, "color": COLOR_COHORTE}},
-            *capas_de_etiquetas(etiquetas_finales(curva), y),
+            {
+                "data": {"values": etiquetas_al_borde(curva)},
+                "mark": {"type": "text", "align": "left", "dx": 7, "fontSize": 12},
+                "encoding": {"y": y, "text": {"field": "cohorte"}},
+            },
+            {
+                "data": {"values": terminan_antes(curva)},
+                "mark": {"type": "point", "filled": True, "size": 44},
+                "encoding": {"y": y, "color": COLOR_COHORTE},
+            },
             {
                 "mark": {"type": "point", "filled": True, "size": 60},
                 "encoding": {"y": y, "color": COLOR_COHORTE, "opacity": visible_al_pasar},
@@ -599,7 +595,11 @@ def pagina(corte: str, curva: list[dict], pozos: list[dict], base: str) -> str:
         f"Desde 2021 las cohortes se mueven entre {numero(min(desde_2021))} y "
         f"{numero(max(desde_2021))} m3: la mejora entre generaciones se frenó. Cada línea es "
         f"una cohorte, del azul más claro ({COHORTES[0]}) al más oscuro ({COHORTES[-1]}), y "
-        "llega hasta el mes al que ya llegó al menos la mitad de sus pozos."
+        "llega hasta el mes al que ya llegó al menos la mitad de sus pozos: "
+        + " y ".join(
+            f"la {f['cohorte']} termina en el mes {f['mes']}" for f in terminan_antes(curva)
+        )
+        + "."
     )
     lectura_diseno = (
         f"Entre las cohortes {primera['cohorte']} y {ultima['cohorte']}, la rama mediana pasó "
