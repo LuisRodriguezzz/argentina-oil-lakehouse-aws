@@ -47,6 +47,7 @@ entre corridas ([ADR 0001](docs/adr/0001-lakehouse-serverless-en-aws.md)).
 | `pipelines/aws/` | Wrappers de Glue: traducen los argumentos del job a variables de entorno y resuelven el secreto por SSM. |
 | [`infra/terraform/`](infra/terraform/README.md) | 29 recursos por ambiente, dev y prod con workspaces; `terraform destroy` deja costo cero. |
 | [`infra/terraform/bootstrap/`](infra/terraform/bootstrap/README.md) | State remoto en S3 con bloqueo en DynamoDB, y los dos roles de OIDC del despliegue. |
+| `scripts/informe_gold.py` | La página de hallazgos: tres consultas a gold en Athena y un HTML autocontenido con cuatro gráficos, sin servidor. |
 | `.github/workflows/` | CI que no toca AWS (lint, 140 tests, `dbt parse`, Terraform) y CD por ambiente con OIDC. |
 
 ## Fuentes
@@ -134,6 +135,11 @@ Tres hallazgos sobre el dato, no sobre la infraestructura:
   completo: 0 diferencias en producción, inyección y estado, +159 declaraciones rectificadas, y
   es la única que la Secretaría sigue actualizando
   ([comparación](docs/fuentes/comparacion-familias-produccion.md)).
+
+Los gráficos están en [`docs/hallazgos.html`](docs/hallazgos.html): curva tipo por cohorte,
+rama contra producción pozo por pozo, petróleo por etapa y ranking de operadoras, sobre los
+pozos petrolíferos shale de Vaca Muerta. La página la genera `scripts/informe_gold.py` con
+tres consultas a gold en Athena y se regenera con `uv run python scripts/informe_gold.py`.
 
 ## Qué no hace
 
