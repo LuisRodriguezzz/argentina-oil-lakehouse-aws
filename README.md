@@ -43,7 +43,7 @@ entre corridas ([ADR 0001](docs/adr/0001-lakehouse-serverless-en-aws.md)).
 | `pipelines/spark_jobs/bronze_load.py` | Carga cruda con linaje por fila y reemplazo de la partición del recurso. |
 | [`pipelines/contracts/`](pipelines/contracts/README.md) | Contratos de datos en YAML: tipos, rangos, checks duros y cuarentena auditable. |
 | `pipelines/reservas/` | Un Excel de doble entrada, con 7 filas de encabezado y rangos fusionados, parseado por vocabulario. |
-| `pipelines/dbt/` | Modelo dimensional con SCD tipo 2 sobre 21 años: 9 modelos, 91 tests y documentación por columna. |
+| `pipelines/dbt/` | Modelo dimensional con SCD tipo 2 sobre 21 años: 9 modelos, 92 tests y documentación por columna. |
 | `pipelines/aws/` | Wrappers de Glue: traducen los argumentos del job a variables de entorno y resuelven el secreto por SSM. |
 | [`infra/terraform/`](infra/terraform/README.md) | 29 recursos por ambiente, dev y prod con workspaces; `terraform destroy` deja costo cero. |
 | [`infra/terraform/bootstrap/`](infra/terraform/bootstrap/README.md) | State remoto en S3 con bloqueo en DynamoDB, y los dos roles de OIDC del despliegue. |
@@ -105,7 +105,7 @@ declaraciones ([ficha del padrón](docs/fuentes/pozo_primera_produccion.md)).
 | Recursos que fallaron un check duro | 0 |
 | Tramos de vigencia en `dim_pozo` (SCD tipo 2) | 611.677 |
 | Pozos en el mart, con completación y producción cruzadas | 4.635 |
-| Tests de dbt en verde, dentro del job de gold | 91 |
+| Tests de dbt en verde, dentro del job de gold | 92 |
 | Tests de Python en verde, en el CI | 140 |
 | Costo de la reconstrucción completa | < 2 USD |
 
@@ -115,7 +115,7 @@ declaraciones ([ficha del padrón](docs/fuentes/pozo_primera_produccion.md)).
 | Bronze de producción | Spark, 4 workers | 7 min |
 | Silver de producción + padrón | Spark, 4 workers | 19 + 2 min |
 | Fractura y reservas, máquinas completas | | 6 y 5 min |
-| Gold (9 modelos, 91 tests sobre Athena) | Glue 5.0, 2 workers | 7 min |
+| Gold (9 modelos, 92 tests sobre Athena) | Glue 5.0, 2 workers | 7 min |
 
 Casi todo el tiempo es la descarga del portal. Gold cuesta unos 0,15 USD por corrida.
 
