@@ -109,13 +109,15 @@ request (ADR 0004), y correrlos dos veces no agrega información. Lo que falta p
 un gate de verdad es protección de rama en `main`, que hoy no está: el repo lo toca una sola
 persona y nada impide un push directo. Está anotado como límite en el README.
 
-### Neon y SSM: un branch y un parámetro por ambiente
+### Neon y SSM: una base y un parámetro por ambiente
 
-El manifiesto de ingesta vive en Neon (ADR 0001). Neon tiene branches copy-on-write: `main` es
-el de producción y `dev` sale de él, arranca con los mismos datos y cuesta lo mismo (cero, en el
-plan gratuito). Cada uno tiene su cadena de conexión, guardada como SecureString en
-`/oil-lakehouse/dev/postgres_dsn` y `/oil-lakehouse/prod/postgres_dsn`. Los parámetros se crean
-a mano, fuera de Terraform: son secretos.
+El manifiesto de ingesta vive en Neon (ADR 0001). Cada ambiente tiene su propia base de datos
+en el mismo proyecto de Neon, `oil_lakehouse_dev` y `oil_lakehouse_prod`: compartir una haría
+que la ingesta de un ambiente diera por descargados los archivos del otro, porque el
+manifiesto es justamente la memoria de qué se bajó. Cada base tiene su cadena de conexión,
+guardada como SecureString en `/oil-lakehouse/dev/postgres_dsn` y
+`/oil-lakehouse/prod/postgres_dsn`. Los parámetros se crean a mano, fuera de Terraform: son
+secretos.
 
 La política del rol de Glue quedó acotada al parámetro de **su** ambiente y no a
 `/oil-lakehouse/*`: una corrida de dev no puede leer el DSN de producción ni pasándole el nombre
@@ -133,16 +135,13 @@ de aprobación que nadie mira. Cuando prod se rompa por algo que dev no vio, ent
 
 - Los dos ambientes conviven en la misma cuenta sin pisarse, y el costo en reposo sigue siendo
   cero: los schedules nacen deshabilitados en los dos (`enable_schedule = false`).
-- **Los dos ambientes están aplicados** (29 recursos cada uno; dev el 2026-09-11, prod el
-  2026-09-12) y cargados: dev con producción acotada a 2024, prod con los 21 años. Cada uno
-  tiene su propia base de Neon para el manifiesto (`oil_lakehouse_dev`, `oil_lakehouse_prod`,
-  en el mismo branch): compartirla haría que la ingesta de un ambiente diera por descargados
-  los archivos del otro.
-- **El despliegue es automático desde el 2026-09-12.** El state es remoto (`bootstrap/`
-  aplicado), `deploy.yml` corre con `DEPLOY_ENABLED = true`, dev se despliega en cada merge a
-  `main` y prod espera una aprobación manual en el GitHub Environment. Aplicar `bootstrap/` era
-  condición previa: un runner de GitHub arranca vacío y con backend local creería que no existe
-  nada.
+- **Los dos ambientes están aplicados** (29 recursos cada uno) y cargados: dev con producción
+  acotada a 2024, prod con los 21 años. Cada uno tiene su propia base de Neon para el
+  manifiesto (`oil_lakehouse_dev`, `oil_lakehouse_prod`) y su propio parámetro de SSM.
+- **El despliegue es automático.** El state es remoto (`bootstrap/`), `deploy.yml` corre con
+  `DEPLOY_ENABLED = true`, dev se despliega en cada merge a `main` y prod espera una aprobación
+  manual en el GitHub Environment. `bootstrap/` es condición previa: un runner de GitHub arranca
+  vacío y con backend local creería que no existe nada.
 - Aparece una variable de entorno más en el contrato entre Terraform y el código
   (`GLUE_DATABASE_SUFFIX`). Si Terraform deja de pasarla, los jobs escriben en `bronze` a secas
   en vez de fallar: es un default silencioso, y el precio de que los contratos no nombren el

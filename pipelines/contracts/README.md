@@ -2,8 +2,9 @@
 
 Un contrato por tabla silver, en YAML versionado. Hoy son cuatro: `produccion_pozo`,
 `pozo_primera_produccion`, `fractura` y `reservas`. Lo lee una persona para saber qué hay en la
-tabla y lo lee `pipelines/spark_jobs/silver_load.py` para castear y validar: no hay dos
-definiciones que puedan desincronizarse (ADR 0002).
+tabla y lo lee [`pipelines/spark_jobs/silver_load.py`](../spark_jobs/README.md) para castear
+y validar: no hay dos definiciones que puedan desincronizarse
+([ADR 0002](../../docs/adr/0002-contratos-de-datos-en-yaml.md)).
 
 ## Cómo se invoca en AWS
 

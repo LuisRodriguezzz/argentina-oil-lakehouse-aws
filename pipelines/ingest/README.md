@@ -1,16 +1,15 @@
 # Ingesta a landing
 
 Baja las fuentes públicas del upstream argentino a la zona `landing/` del bucket del lakehouse,
-en streaming, y registra cada intento en la tabla `ingestion_manifest` de Postgres. No escribe
-nada en disco. El registro de fuentes es `datasets.yaml`: hoy son `produccion_pozo` (CKAN),
+en streaming, y registra cada intento en el manifiesto: la tabla `ingestion_manifest` de
+Postgres, con archivo, fecha, tamaño, sha256 y resultado. No escribe nada en disco. El registro de fuentes es `datasets.yaml`: hoy son `produccion_pozo` (CKAN),
 `fractura` (CKAN) y `reservas` (ZIP anual por URL).
 
 ## Cómo se invoca en AWS
 
 Es un único job de Glue Python shell genérico, `ingest_landing`, al que cada máquina de estados
 le pasa su `--dataset`. El wrapper es `pipelines/aws/ingest_job.py` y llama a `runner.run()`
-directo, sin pasar por la CLI: typer necesita Python 3.10 y Python shell trae 3.9. Por eso
-`manifest.py` tampoco puede usar sintaxis ni stdlib posterior a 3.9 (ver `_now`).
+directo, sin pasar por la CLI.
 
 Desde el host, contra el mismo bucket, con la CLI:
 
@@ -31,9 +30,14 @@ código de salida 1 si algún recurso falló; el resto de la corrida sigue igual
 
 - **Registro declarativo** (`datasets.yaml`): agregar una fuente no requiere tocar código.
   Además de `include`/`exclude` (regex sobre el nombre) hay `formats`, porque el recurso
-  "Capítulo IV - Pozos" existe con el mismo nombre en CSV y en SHP.
-- **Familia DDJJ**: de las dos familias por año se ingesta la de "DDJJ abiertas y cerradas".
-  La deduplicación es por `resource_id`, no por nombre: el portal repite 2024 con dos ids.
+  "Capítulo IV - Pozos" (un catálogo de pozos) existe con el mismo nombre en CSV y en SHP.
+- **Familia DDJJ**: el portal publica cada año de producción en dos CSV, el "normal" y el de
+  "DDJJ abiertas y cerradas"; se ingesta el segundo, el único que sigue actualizándose
+  ([comparación](../../docs/fuentes/comparacion-familias-produccion.md)). La deduplicación es
+  por `resource_id`, no por nombre: el portal repite 2024 con dos ids.
+- **Python 3.9 en Python shell**: el job de Glue más barato trae Python 3.9, así que el wrapper
+  no pasa por la CLI (typer pide 3.10) y `manifest.py` no usa sintaxis ni stdlib posteriores.
+  `ruff` lo verifica con una versión objetivo por archivo (`pyproject.toml`).
 - **HTTP plano**: `https://datos.energia.gob.ar` redirige 301 a `http`. `force_http` baja el
   esquema para los hosts `*.energia.gob.ar` y así se evita el redirect en cada descarga.
 - **Idempotencia en dos niveles**: si `size` y `last_modified` de origen coinciden con la

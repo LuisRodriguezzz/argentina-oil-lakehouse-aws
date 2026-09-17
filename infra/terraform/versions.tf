@@ -46,8 +46,8 @@ locals {
   sufijo      = "-${var.environment}"
   sufijo_bajo = "_${var.environment}"
 
-  # Un parámetro de SSM por ambiente: dev apunta al branch `dev` de Neon y prod al `main`,
-  # así una corrida de dev no puede escribir el manifiesto de producción (ADR 0005). Se
-  # crean a mano, fuera de Terraform: son secretos.
+  # Un parámetro de SSM por ambiente, cada uno con el DSN de la base de Neon de su ambiente
+  # (`oil_lakehouse_dev`, `oil_lakehouse_prod`), así una corrida de dev no puede escribir el
+  # manifiesto de producción (ADR 0005). Se crean a mano, fuera de Terraform: son secretos.
   postgres_dsn_ssm_parameter = "/oil-lakehouse/${var.environment}/postgres_dsn"
 }

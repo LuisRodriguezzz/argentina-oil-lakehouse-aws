@@ -5,9 +5,10 @@
 ## Contexto
 
 Silver tiene que tipar lo que bronze guardó como string y decidir qué filas son publicables.
-Ese conocimiento (tipos, unicidad, rangos verificados en la semana 0: `tef` en [0, 744],
-`prod_*` ≥ 0, `empresa` no nula) puede vivir en el código del job, en una herramienta de
-calidad aparte, o en un archivo declarativo. Si vive en dos lugares, se desincronizan.
+Ese conocimiento (tipos, unicidad, rangos verificados sobre el CSV de 2024, ver la
+[ficha](../fuentes/produccion_pozo.md): `tef` en [0, 744], `prod_*` ≥ 0, `empresa` no nula)
+puede vivir en el código del job, en una herramienta de calidad aparte, o en un archivo
+declarativo. Si vive en dos lugares, se desincronizan.
 
 ## Decisión
 

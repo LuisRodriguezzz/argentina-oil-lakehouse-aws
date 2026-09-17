@@ -96,7 +96,7 @@ locals {
   } }
 
   # Gold no es un pipeline de fuente: no ingiere ni tipa nada, corre un solo job que arma los
-  # ocho modelos con dbt. Entra igual al mismo `for_each` para no repetir el recurso de la
+  # modelos con dbt. Entra igual al mismo `for_each` para no repetir el recurso de la
   # máquina de estados ni el del schedule.
   definiciones = merge(
     { for nombre, pipeline in local.pipelines : nombre => {

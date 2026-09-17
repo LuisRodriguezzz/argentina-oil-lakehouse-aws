@@ -1,14 +1,14 @@
 # Infraestructura en AWS — runbook
 
 Lo mínimo para correr las cuatro capas: un bucket S3, el Glue Data Catalog, cinco jobs de
-Glue, una máquina de estados por pipeline y un workgroup de Athena. Son 29 recursos por
-ambiente. El porqué de cada elección está en `docs/adr/`: ADR 0001 para Glue, Step Functions y
-Athena, ADR 0003 para gold con dbt.
+Glue, una máquina de estados por pipeline y un workgroup de Athena (el grupo de consultas con
+su ubicación de resultados). Son 29 recursos por ambiente. El porqué de cada elección está en
+`docs/adr/`: ADR 0001 para Glue, Step Functions y Athena, ADR 0003 para gold con dbt.
 
 | Job | Tipo | Qué hace |
 | --- | --- | --- |
-| `ingest_landing` | Python shell 3.9, 1/16 DPU | Baja los recursos de un dataset a `landing/`. |
-| `bronze_load` | Glue 5.0 Spark, N × G.1X | CSV de landing a las tablas Iceberg de bronze. |
+| `ingest_landing` | Python shell 3.9, 1/16 DPU (la unidad de cómputo de Glue) | Baja los recursos de un dataset a `landing/`. |
+| `bronze_load` | Glue 5.0 Spark, N × G.1X (el worker estándar: 4 vCPU, 16 GB) | CSV de landing a las tablas Iceberg de bronze. |
 | `bronze_reservas` | Python shell 3.9, 1 DPU | Parsea el XLSX anual de reservas y escribe `bronze.reservas` con pyiceberg. |
 | `silver_load` | Glue 5.0 Spark, N × G.1X | Aplica un contrato y escribe la tabla silver. |
 | `gold_dbt` | Glue 5.0, 2 × G.1X fijos | `dbt build`; el SQL lo ejecuta Athena. |
@@ -34,7 +34,7 @@ variable `environment` sufija el nombre de cada recurso y el aislamiento del sta
 | Roles / workgroup | `argentina-oil-lakehouse-glue-job-dev`, `oil-lakehouse-dev` | `…-prod` |
 | Workers de Spark | 2 (el mínimo de Glue) | 4 |
 | Schedules | deshabilitados | deshabilitados |
-| DSN de Neon | `/oil-lakehouse/dev/postgres_dsn` (branch `dev`) | `/oil-lakehouse/prod/postgres_dsn` (branch `main`) |
+| DSN de Neon | `/oil-lakehouse/dev/postgres_dsn` (base `oil_lakehouse_dev`) | `/oil-lakehouse/prod/postgres_dsn` (base `oil_lakehouse_prod`) |
 
 `environment` **no tiene default**: siempre hay que pasar el `-var-file`. Y el workspace tiene
 que coincidir con el ambiente del tfvars: `aws_s3_bucket.lakehouse` lleva una `precondition`
@@ -46,7 +46,19 @@ y dbt; los YAML de contratos siguen sin nombrar el ambiente
 ([ADR 0005](../../docs/adr/0005-ambientes-dev-y-prod.md)).
 
 El state vive en S3, un archivo por workspace, con bloqueo en DynamoDB. El bucket y la tabla
-los crea [`bootstrap/`](bootstrap/README.md), aplicado el 2026-09-12.
+los crea [`bootstrap/`](bootstrap/README.md).
+
+## Antes del primer despliegue: la base de Neon y su DSN
+
+El manifiesto de ingesta vive en Postgres, en un proyecto gratuito de [Neon](https://neon.tech)
+con una base por ambiente (`oil_lakehouse_dev`, `oil_lakehouse_prod`). Cada ambiente necesita
+un parámetro SecureString con la cadena de conexión a su base. Se crean a mano y no los maneja
+Terraform: son secretos.
+
+```powershell
+aws ssm put-parameter --name /oil-lakehouse/dev/postgres_dsn --type SecureString `
+  --value "postgresql://..." --overwrite
+```
 
 ## Desplegar: desde GitHub
 
@@ -54,12 +66,12 @@ Es el camino normal y no requiere ningún comando local. `.github/workflows/depl
 
 | Evento | Qué pasa |
 | --- | --- |
-| Pull request que toca `infra/terraform/**`, `pipelines/**` o `pyproject.toml` | `terraform plan` de dev, para leerlo en el PR. |
+| Pull request que toca `infra/terraform/**`, `pipelines/**`, `pyproject.toml` o el propio workflow | `terraform plan` de dev, para leerlo en el PR. |
 | Merge a `main` | `apply` de dev, `uv build` del wheel y subida del wheel y los wrappers a `artifacts/`. |
 | Después de dev | `apply` de prod, esperando aprobación manual en el GitHub Environment `prod`. Baja el wheel de dev en vez de reconstruirlo. |
 
-Se autentica con OIDC (`role-to-assume`), sin claves en los secretos del repo. Está habilitado
-desde el 2026-09-12, con la variable de repo `DEPLOY_ENABLED = true`. Cómo se llegó ahí, en
+Se autentica con OIDC (`role-to-assume`), sin claves en los secretos del repo, y corre solo
+si la variable de repo `DEPLOY_ENABLED` vale `true`. Lo que tiene que existir antes, en
 [`bootstrap/README.md`](bootstrap/README.md).
 
 ## Desplegar: desde una máquina de desarrollo
@@ -82,16 +94,6 @@ nada. Los jobs leen su script de `s3://<bucket>/artifacts/` en cada corrida: des
 código alcanza con volver a correrlo, sin `terraform apply`. Si cambia la versión del proyecto,
 actualizar también la variable `wheel_name`. El proyecto de dbt (`pipelines/dbt/`) viaja
 adentro del wheel, así que un modelo nuevo tampoco necesita Terraform.
-
-## Requisito externo: el DSN de Neon
-
-Un parámetro SecureString por ambiente, con la cadena de conexión al branch de Neon que
-corresponda. Se crean a mano y no los maneja Terraform: son secretos.
-
-```powershell
-aws ssm put-parameter --name /oil-lakehouse/dev/postgres_dsn --type SecureString `
-  --value "postgresql://..." --overwrite
-```
 
 ## Correr un pipeline
 
@@ -167,7 +169,7 @@ terraform apply   -var-file=envs\prod.tfvars
 
 # Si el manifiesto de ingesta ya está en Neon pero landing quedó vacío, hay que olvidarlo
 # para que la ingesta vuelva a bajar los archivos.
-# (Desde el host, con el DSN del branch de Neon del ambiente en el entorno.)
+# (Desde el host, con el DSN de la base de Neon del ambiente en el entorno.)
 uv run python -c "from pipelines.ingest.manifest import Manifest, ingestion_manifest; import os; m = Manifest(os.environ['POSTGRES_DSN']); c = m.engine.connect(); c.execute(ingestion_manifest.delete()); c.commit()"
 
 $maquinas = terraform output -json state_machine_arns | ConvertFrom-Json
@@ -177,16 +179,15 @@ foreach ($nombre in "produccion_pozo_mensual", "fractura_diaria", "reservas_mens
 }
 ```
 
-El orden importa: `gold_mensual` al final, porque `mart_pozo_completacion_produccion` cruza
-producción con fractura y con el padrón de pozos. Si alguna fuente falta, el mart sale corto y
-los tests de relación entre hechos y dimensiones lo delatan.
+El orden importa: `gold_mensual` al final, porque gold lee las cuatro tablas de silver y el
+mart cruza la producción con la fractura. Si alguna fuente falta, el mart sale corto y los
+tests de relación entre hechos y dimensiones lo delatan.
 
 Verificación, con `scripts/aws_logs.ps1` para los logs y con Athena para las filas:
 
 ```sql
--- Conteos medidos en prod el 2026-09-12. Fractura y producción crecen con cada republicación
--- del portal; reservas y el mart no, porque el ZIP anual y el padrón de pozos ya están
--- cerrados.
+-- Conteos de septiembre de 2026. Producción, fractura y el mart cambian con cada
+-- republicación del portal; reservas, recién con el próximo ZIP anual.
 SELECT count(*) FROM silver_prod.produccion_pozo;          -- 18.234.202
 SELECT count(*) FROM silver_prod.pozo_primera_produccion;  --     86.197
 SELECT count(*) FROM silver_prod.fractura;                 --      4.878

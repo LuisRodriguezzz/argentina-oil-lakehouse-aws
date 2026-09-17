@@ -7,7 +7,8 @@
 environment = "dev"
 
 # El mínimo que acepta Glue para un job de Spark. Dev no procesa los 18 millones de filas de
-# producción: alcanza con una fuente chica (fractura) para saber si el pipeline corre.
+# producción: corre con la producción acotada a un año (2024) y las fuentes chicas enteras,
+# suficiente para saber si el pipeline corre.
 number_of_workers = 2
 
 # Deshabilitados: dev existe para probar cambios a mano, no para quedar corriendo solo.
