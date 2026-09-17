@@ -2,7 +2,9 @@
 
 Bronze y silver del lakehouse. Corren como jobs de Glue 5.0 (`glueetl`); los wrappers de
 `pipelines/aws/` traducen los argumentos del job a variables de entorno y llaman a `main()`.
-No hay forma de correrlos fuera de AWS: el catálogo `lake` es el Glue Data Catalog.
+No hay forma de correrlos fuera de AWS: el catálogo `lake` es el Glue Data Catalog. Una misma
+tabla se nombra `lake.silver.fractura` desde Spark y `silver_<ambiente>.fractura` desde Athena
+(el sufijo del ambiente lo agrega `GLUE_DATABASE_SUFFIX`, ADR 0005).
 
 ## bronze_load
 
@@ -19,7 +21,8 @@ partición por recurso (`_resource_id`). Qué hace, en orden:
 
 ## silver_load
 
-Aplica un contrato de datos (`pipelines/contracts/*.yaml`, ADR 0002) sobre una tabla bronze y
+Aplica un contrato de datos ([`pipelines/contracts/`](../contracts/README.md), ADR 0002) sobre
+una tabla bronze y
 escribe `lake.silver.*` tipada y particionada. Qué hace, por recurso pendiente:
 
 1. Compara `_resource_id -> _source_sha256` entre bronze y silver: procesa solo lo nuevo o
@@ -68,11 +71,12 @@ agrupada por motivo.
 - **Una partición por recurso.** `overwritePartitions()` reemplaza el año que se recarga sin
   tocar el resto, y `write.spark.accept-any-schema` + `merge-schema` tolera que un año traiga
   columnas que otro no tiene (2006 y 2024 no comparten esquema exacto).
-- **Una tabla por tipo de recurso** (`bronze_tables.yaml`): `produccion_pozo` mezcla los
-  anuales de DDJJ con "No Convencional" (un subconjunto: en la misma tabla duplicaría filas),
-  "Capítulo IV - Pozos" (catálogo) y el padrón de primera producción (tres columnas). Un
-  recurso que no matchea ningún patrón se saltea con un WARNING: preferimos no cargarlo a
-  cargarlo en la tabla equivocada.
+- **Una tabla por tipo de recurso** (`bronze_tables.yaml`). El dataset de producción del
+  portal no es homogéneo: además de los CSV anuales de DDJJ trae "No Convencional" (un
+  subconjunto de los anuales: en la misma tabla duplicaría filas), "Capítulo IV - Pozos" (un
+  catálogo de pozos) y el padrón de primera producción (tres columnas). Cada uno va a su
+  propia tabla bronze. Un recurso que no matchea ningún patrón se saltea con un WARNING:
+  preferimos no cargarlo a cargarlo en la tabla equivocada.
 - **El manifiesto se lee por JDBC**, no con SQLAlchemy: Glue instala el wheel con `--no-deps`
   y el runtime ya trae el driver de Postgres para Spark.
 - **BOM.** Los CSV del portal son UTF-8 con BOM y Spark no lo saca: el nombre de la primera

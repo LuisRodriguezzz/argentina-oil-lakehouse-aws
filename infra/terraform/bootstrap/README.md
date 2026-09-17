@@ -1,7 +1,9 @@
 # Bootstrap: lo que tiene que existir antes de los ambientes
 
-Diez recursos que no pertenecen a `dev` ni a `prod` sino a los dos, y que por eso no pueden
-vivir en `../`: un `terraform destroy` de un ambiente se los llevaría puestos.
+Diez recursos de Terraform que no pertenecen a `dev` ni a `prod` sino a los dos, y que por eso
+no pueden vivir en `../`: un `terraform destroy` de un ambiente se los llevaría puestos. Son el
+bucket de state con su versionado, cifrado y bloqueo de acceso público, la tabla de locks, el
+proveedor OIDC y los dos roles con sus políticas.
 
 | Recurso | Para qué |
 | --- | --- |
@@ -10,10 +12,9 @@ vivir en `../`: un `terraform destroy` de un ambiente se los llevaría puestos.
 | Proveedor OIDC de `token.actions.githubusercontent.com` | Que AWS acepte los tokens que emite GitHub Actions. |
 | Roles `argentina-oil-lakehouse-github-dev` y `-prod` | Lo que asume el workflow. Sin claves de acceso en los secretos del repo. |
 
-Está aplicado desde el 2026-09-12. Los diez recursos existen, el state de `../` vive en el
-bucket con los dos workspaces migrados, y `deploy.yml` corre con `DEPLOY_ENABLED = true`. El
-state de este directorio sigue siendo local, en `bootstrap/terraform.tfstate`: es el único que
-no puede guardarse en el bucket que él mismo crea.
+El state de este directorio es local, en `bootstrap/terraform.tfstate`: es el único que no
+puede guardarse en el bucket que él mismo crea. El de `../` vive en ese bucket, un archivo por
+workspace.
 
 En reposo cuesta prácticamente cero: S3 con unos KB de state y una tabla de DynamoDB en
 `PAY_PER_REQUEST` que solo se escribe durante un `apply`.

@@ -8,7 +8,7 @@ de la edad del pozo en gold, pero el mes no es confiable (ver "Rarezas medidas")
 la primera producción desde las declaraciones y guarda la del padrón aparte, como cruce
 (`dim_pozo.primera_produccion_padron`).
 
-Medido el 2026-09-06 sobre el CSV descargado del portal, en el proyecto de origen (ADR 0006):
+Medido el 2026-09-06 sobre el CSV descargado del portal:
 **86.197 filas, 3 columnas**, 1,2 MB.
 
 ## Columnas
@@ -47,7 +47,7 @@ DDJJ abiertas y cerradas (no con la familia normal, congelada desde marzo).
   - 2.633 (69 %) tienen primera producción en 2023 o antes (1.924 de ellos en 2006) y sin
     embargo no producen en 2024: son pozos que dejaron de producir antes de ese año
     (abandonados, en estudio, etc.), consistente con el tercio de filas de `produccion_pozo`
-    que semana 0 ya había identificado como pozos que no producen.
+    que declaran sin producción ese mes.
   - Ningún pozo tiene `anio=2024` en el padrón y falta en la producción de 2024: los pozos que
     arrancan un año siempre tienen al menos una fila ese mismo año.
 - **El mes solo es real en el año en curso** (medido el 2026-09-16 sobre silver en prod):
@@ -61,8 +61,8 @@ DDJJ abiertas y cerradas (no con la familia normal, congelada desde marzo).
   Consecuencia en gold: `dim_pozo.primera_produccion` se calcula desde `produccion_pozo` como
   el primer mes con `prod_pet > 0 or prod_gas > 0`, y de ahí salen `meses_desde_primera_produccion`,
   los `prod_*_12m` del mart de pozos y la curva tipo. La fecha del padrón queda en
-  `dim_pozo.primera_produccion_padron` para cruzar. Hasta el 2026-09-16 gold usaba el padrón, y
-  "12 meses" era en realidad "hasta diciembre del año de arranque".
+  `dim_pozo.primera_produccion_padron` para cruzar. Por eso gold no usa el mes del padrón: con
+  él, "12 meses" habría sido "hasta diciembre del año de arranque".
 
 ## Decisiones del contrato
 

@@ -26,7 +26,7 @@ Los tests van con los modelos: `unique`, `not_null` y `relationships` en los YAM
 tests singulares en SQL (grano único de dos hechos y de la curva tipo, vigencias de `dim_pozo`
 sin solapamiento, arena por etapa, cocientes y medidas no negativas, la cohorte igual al año de
 la primera producción, la primera producción como primer mes con producción, la completación
-anterior a la producción y una reconciliación de la producción 2024 contra silver). Son 92
+anterior a la producción y una reconciliación de la producción 2024 contra silver). Son 94
 tests que corren en el mismo `dbt build` que construye las tablas, así que una tabla mal
 construida no queda publicada en silencio.
 
@@ -73,10 +73,10 @@ lugares del mismo modelo. Una definición por operación, y los modelos se leen 
   `athena-results/`, que es donde dbt-athena los pondría por defecto y donde la regla de ciclo
   de vida del bucket los borraría a los siete días.
 - El job de gold instala unos cincuenta paquetes en cada corrida (dbt y el wheel con sus
-  dependencias). Medido en `prod`: 4 minutos de job para 8 modelos y 82 tests el 2026-09-12, y
-  7 minutos para 9 modelos y 91 tests el 2026-09-16, todos en verde. Buena parte es arranque
-  del clúster e instalación, no `dbt build`; y el arranque depende de cuánto tarde Glue en
-  conseguir capacidad, que ese mismo día llegó a 8 minutos en una corrida. Es el precio de no
+  dependencias). Medido en `prod`: 4 minutos de job con 8 modelos y 82 tests; entre 5 y 7
+  con los 9 modelos y 94 tests actuales. Buena parte es arranque del clúster e instalación, no
+  `dbt build`; y antes de eso Glue puede tardar varios minutos en asignar capacidad (se midió
+  una espera de 8), que Step Functions muestra como parte de la tarea. Es el precio de no
   mantener una imagen propia.
 - Un modelo nuevo no necesita `terraform apply`: el proyecto de dbt viaja en el wheel, así que
   alcanza con volver a correr `scripts/aws_deploy.ps1`.

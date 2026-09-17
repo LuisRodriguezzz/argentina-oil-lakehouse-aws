@@ -1,6 +1,7 @@
 # Fuente: datos de fractura de pozos (Adjunto IV)
 
-Dataset `datos-de-fractura-de-pozos-adjunto-iv` del portal de la Secretaría de Energía. Un
+Dataset `datos-de-fractura-de-pozos-adjunto-iv` del portal de la Secretaría de Energía (el
+Adjunto IV es el formulario con que las operadoras declaran cada operación de fractura). Un
 CSV único que se reemplaza entero todos los días, con **una fila por operación de fractura
 declarada**: cuánta arena y agua se bombeó, cuántas etapas, qué presión y qué equipo. Es el
 lado "cómo se estimuló el pozo" del que `produccion_pozo` cuenta el resultado; se cruzan por
@@ -49,7 +50,15 @@ Medido sobre `lake.bronze.fractura` el 2026-09-05: **4.890 filas, 30 columnas de
 `id_base_fractura_adjiv` es único: 4.890 valores distintos sobre 4.890 filas. Se verificó que
 `idpozo` **no** alcanza (4.646 claves) y que `idpozo + fecha_inicio_fractura` **tampoco**
 (4.860 claves): hay pozos con varias declaraciones el mismo día, hasta 6 para el pozo 159341
-el 2018-05-28. Son las etapas de un mismo pozo declaradas por separado, no filas repetidas.
+el 2018-05-28. Casi siempre son partes de un mismo trabajo declaradas por separado (se suman);
+unas pocas son filas repetidas exactas, con las mismas fechas, rama, etapas y arena.
+
+Medido el 2026-09-16 sobre `gold.fact_fractura`, por pozo: 4.453 tienen una sola declaración
+y 182 tienen más de una. De esos, 59 tienen un trabajo partido en varias filas (menos de 45
+días entre una y otra) y 129 tienen más de un trabajo (una re-fractura más de 45 días
+después); algunos están en las dos cuentas. `mart_pozo_completacion_produccion` consolida las
+filas de un mismo trabajo y, para emparejar con la producción temprana, elige el trabajo
+anterior a la primera producción del pozo.
 
 `fecha_data` es el campo de actualización, así que es el `dedupe_by` del contrato: si una
 declaración vuelve corregida gana la de `fecha_data` más alta.

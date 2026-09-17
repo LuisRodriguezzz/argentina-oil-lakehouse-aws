@@ -9,7 +9,8 @@
 El pipeline entero —ingesta, bronze, silver sobre Iceberg y gold— tiene que correr en AWS con
 un presupuesto de 5 USD y créditos de plan gratuito. La restricción no es técnica sino
 económica: cualquier recurso que quede prendido —un NAT Gateway, una instancia de RDS, un
-clúster de EMR, un entorno de MWAA— consume el presupuesto entero sin que nadie ejecute nada.
+clúster de EMR, un entorno de MWAA (el Airflow administrado de AWS)— consume el presupuesto
+entero sin que nadie ejecute nada.
 
 De ahí el principio que ordena todas las elecciones de abajo: **costo cero en reposo**. Si
 nadie dispara una corrida, la cuenta no factura más que unos MB en S3. Todo lo que se elija
@@ -46,15 +47,12 @@ vive en SSM Parameter Store como SecureString y los jobs reciben el *nombre* del
 nunca el valor: un secreto en los argumentos de un job queda visible en la consola y en
 `get-job-runs`.
 
-**State de Terraform: local mientras el operador sea uno.** El entorno es efímero: se crea, se
-demuestra y se destruye. Un backend remoto pide un bucket y una tabla de locks que sobreviven
-al `destroy`, y con una sola persona aplicando desde una máquina no hay con quién coordinar.
-`*.tfstate` está en el `.gitignore`.
-
-Esa condición se cayó el 2026-09-12, cuando el despliegue pasó a GitHub Actions: un runner
-arranca vacío y con state local creería que no existe nada. El state vive ahora en S3 con
-bloqueo en DynamoDB (`infra/terraform/bootstrap/`, ADR 0005), y cuesta unos KB en S3 más una
-tabla en `PAY_PER_REQUEST`.
+**State de Terraform en S3 con bloqueo en DynamoDB.** Fue local mientras aplicaba una sola
+persona desde una máquina: no había con quién coordinar y un backend remoto pide recursos que
+sobreviven al `destroy`. Desde que despliega GitHub Actions no alcanza: un runner arranca vacío
+y con state local creería que no existe nada. Hoy vive en S3 con bloqueo en DynamoDB
+(`infra/terraform/bootstrap/`, ADR 0005) y cuesta unos KB en S3 más una tabla en
+`PAY_PER_REQUEST`. `*.tfstate` está en el `.gitignore`.
 
 ## Consecuencias
 
